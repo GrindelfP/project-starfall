@@ -9,7 +9,7 @@ class AsteroidField {
 public:
     struct Rock { DirectX::XMFLOAT3 center; float radius; DirectX::XMFLOAT3 rotation; DirectX::XMFLOAT4 color; };
     static constexpr std::size_t count = 64;
-    static constexpr float shipRadius = 1.8f;
+    static constexpr float shipRadius = 1.9f;
     static constexpr float spawnClearance = 10.0f;
     static constexpr std::uint32_t defaultSeed = 0x53544152u;
 

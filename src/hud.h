@@ -15,12 +15,7 @@ public:
         wc.lpszClassName = L"StarfallHelpPanel";
         if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
             throw std::runtime_error("Cannot register the Starfall help panel");
-        titleFont_ = CreateFontW(-px(19), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH, L"Segoe UI");
-        bodyFont_ = CreateFontW(-px(13), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH, L"Segoe UI");
+        createFonts();
         window_ = CreateWindowExW(WS_EX_NOACTIVATE, wc.lpszClassName, L"Starfall controls",
             WS_CHILD | WS_VISIBLE, px(18), px(18), px(500), px(146), parent, nullptr, wc.hInstance, this);
         if (!window_) {
@@ -35,16 +30,33 @@ public:
         DeleteObject(titleFont_); DeleteObject(bodyFont_);
     }
     void setText(const std::wstring& text) {
-        if (text == text_) return;
+        const UINT currentDpi = GetDpiForWindow(parent_);
+        const bool dpiChanged = currentDpi && currentDpi != dpi_;
+        if (dpiChanged) {
+            dpi_ = currentDpi;
+            DeleteObject(titleFont_); DeleteObject(bodyFont_);
+            createFonts();
+        }
         text_ = text;
         RECT client{};
         GetClientRect(parent_, &client);
-        SetWindowPos(window_, HWND_TOP, px(18), px(18),
-            (std::max)(px(180), (std::min)(px(500), static_cast<int>(client.right) - px(36))), px(146), SWP_NOACTIVATE);
+        const int x = (std::min)(px(18), static_cast<int>(client.right));
+        const int y = (std::min)(px(18), static_cast<int>(client.bottom));
+        const int width = (std::max)(0, (std::min)(px(500), static_cast<int>(client.right) - x));
+        const int height = (std::max)(0, (std::min)(px(146), static_cast<int>(client.bottom) - y));
+        SetWindowPos(window_, HWND_TOP, x, y, width, height, SWP_NOACTIVATE);
         InvalidateRect(window_, nullptr, FALSE);
     }
 private:
     int px(int value) const { return MulDiv(value, static_cast<int>(dpi_), 96); }
+    void createFonts() {
+        titleFont_ = CreateFontW(-px(19), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH, L"Segoe UI");
+        bodyFont_ = CreateFontW(-px(13), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH, L"Segoe UI");
+    }
     static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
         auto* self = reinterpret_cast<Hud*>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
