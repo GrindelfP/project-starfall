@@ -2,6 +2,8 @@
 #include <d3d11sdklayers.h>
 #include <d3dcompiler.h>
 #include <filesystem>
+#include <algorithm>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -186,7 +188,7 @@ void Dx11::resize(unsigned width, unsigned height) {
     createTarget(width, height);
 }
 
-void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view) {
+void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool verifyOrder) {
     constexpr float clear[] = { 0.025f, 0.12f, 0.25f, 1.0f };
     context_->ClearRenderTargetView(target_.Get(), clear);
     context_->ClearDepthStencilView(depthTarget_.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -207,12 +209,37 @@ void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
     context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
     struct Constants { DirectX::XMFLOAT4X4 wvp; DirectX::XMFLOAT4 color; };
     static_assert(sizeof(Constants) == 80);
-    for (const auto& object : objects) {
+    auto draw = [&](const scene::Object& object) {
         Constants values{};
         DirectX::XMStoreFloat4x4(&values.wvp, scene::world(object) * view * DirectX::XMLoadFloat4x4(&projection_));
         values.color = object.color;
         context_->UpdateSubresource(constants_.Get(), 0, nullptr, &values, 0, 0);
         context_->DrawIndexed(static_cast<UINT>(scene::cubeIndices.size()), 0, 0);
+    };
+    for (const auto& object : objects) draw(object);
+    if (verifyOrder) {
+        ComPtr<ID3D11Texture2D> backBuffer, staging;
+        checkDevice(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)), "GetBuffer for depth check");
+        D3D11_TEXTURE2D_DESC desc{}; backBuffer->GetDesc(&desc);
+        desc.Usage = D3D11_USAGE_STAGING; desc.BindFlags = 0; desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ; desc.MiscFlags = 0;
+        checkDevice(device_->CreateTexture2D(&desc, nullptr, &staging), "Create depth check staging texture");
+        auto pixels = [&]() {
+            context_->CopyResource(staging.Get(), backBuffer.Get());
+            D3D11_MAPPED_SUBRESOURCE mapped{};
+            checkDevice(context_->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped), "Map depth check texture");
+            std::vector<unsigned char> result(static_cast<size_t>(desc.Width) * desc.Height * 4);
+            for (UINT y = 0; y < desc.Height; ++y)
+                std::memcpy(result.data() + static_cast<size_t>(y) * desc.Width * 4,
+                    static_cast<const unsigned char*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch, desc.Width * 4);
+            context_->Unmap(staging.Get(), 0);
+            return result;
+        };
+        const auto normal = pixels();
+        context_->ClearRenderTargetView(target_.Get(), clear);
+        context_->ClearDepthStencilView(depthTarget_.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        for (auto it = objects.rbegin(); it != objects.rend(); ++it) draw(*it);
+        if (pixels() != normal) throw std::runtime_error("Depth check: reversed submission changed rendered pixels");
+        log_ << "Depth check: normal and reversed submission produced identical pixels\n";
     }
     checkDevice(swapChain_->Present(1, 0), "Present");
 }
@@ -250,5 +277,3 @@ Dx11::~Dx11() {
     }
 #endif
 }
-
-

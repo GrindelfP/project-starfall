@@ -14,7 +14,7 @@ public:
     ~Dx11();
     void initialize(HWND window, unsigned width, unsigned height);
     void resize(unsigned width, unsigned height);
-    void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view);
+    void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool verifyOrder = false);
 private:
     void checkDevice(HRESULT result, const char* operation);
     void createTarget(unsigned width, unsigned height);
@@ -34,4 +34,3 @@ private:
     Microsoft::WRL::ComPtr<ID3D11BlendState> blend_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depth_;
 };
-

@@ -91,12 +91,15 @@ int main(int argc, char** argv) {
         unsigned long frames = 0;
         bool lifecycleTest = false;
         bool reverseOrder = false;
+        bool depthCheck = false;
         if (argc != 1) {
             lifecycleTest = argc == 2 && std::string(argv[1]) == "--lifecycle-test";
             reverseOrder = argc == 2 && std::string(argv[1]) == "--reverse-order";
-            if (!lifecycleTest && !reverseOrder) {
+            depthCheck = argc == 2 && std::string(argv[1]) == "--depth-check";
+            if (depthCheck) frames = 1;
+            if (!lifecycleTest && !reverseOrder && !depthCheck) {
                 if (argc != 3 || std::string(argv[1]) != "--frames")
-                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test | --reverse-order]");
+                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test | --reverse-order | --depth-check]");
                 const std::string value(argv[2]);
                 size_t parsed = 0;
                 frames = std::stoul(value, &parsed);
@@ -224,7 +227,7 @@ int main(int argc, char** argv) {
                       << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
                 SetWindowTextW(window, title.str().c_str());
                 const auto submitStart = FrameTimer::Clock::now();
-                graphics.present(objects, scene::view());
+                graphics.present(objects, scene::view(), depthCheck);
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
                 ++presented;
                 if (frames && presented >= frames) running = false;
@@ -241,7 +244,3 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
-
-
-
-

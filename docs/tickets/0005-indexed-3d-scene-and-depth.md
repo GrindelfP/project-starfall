@@ -1,7 +1,7 @@
 # 0005 - Indexed 3D scene and depth
 
 Name: Indexed 3D scene and depth
-Status: process
+Status: done
 Dependencies: 0003-frame-timing-and-input.md, 0004-dx11-shader-and-triangle.md.
 
 ## Description
