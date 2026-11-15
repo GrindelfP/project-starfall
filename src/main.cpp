@@ -1,4 +1,4 @@
-#include "dx11.h"
+#include "render_backend.h"
 #include "camera.h"
 #include "frame_timer.h"
 #include "input_state.h"
@@ -95,21 +95,28 @@ int main(int argc, char** argv) {
         bool lifecycleTest = false;
         bool reverseOrder = false;
         bool depthCheck = false;
-        if (argc != 1) {
-            lifecycleTest = argc == 2 && std::string(argv[1]) == "--lifecycle-test";
-            reverseOrder = argc == 2 && std::string(argv[1]) == "--reverse-order";
-            depthCheck = argc == 2 && std::string(argv[1]) == "--depth-check";
-            if (depthCheck) frames = 1;
-            if (!lifecycleTest && !reverseOrder && !depthCheck) {
-                if (argc != 3 || std::string(argv[1]) != "--frames")
-                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test | --reverse-order | --depth-check]");
-                const std::string value(argv[2]);
-                size_t parsed = 0;
+        bool useDx12 = false, clearOnly = false;
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg(argv[i]);
+            if (arg == "--backend" && i + 1 < argc) {
+                const std::string value(argv[++i]);
+                if (value != "dx11" && value != "dx12") throw std::runtime_error("Backend must be dx11 or dx12");
+                useDx12 = value == "dx12";
+            } else if (arg == "--scene" && i + 1 < argc) {
+                if (std::string(argv[++i]) != "reference") throw std::runtime_error("Only the reference scene is available");
+            } else if (arg == "--clear-only") clearOnly = true;
+            else if (arg == "--lifecycle-test") lifecycleTest = true;
+            else if (arg == "--reverse-order") reverseOrder = true;
+            else if (arg == "--depth-check") { depthCheck = true; frames = 1; }
+            else if (arg == "--frames" && i + 1 < argc) {
+                const std::string value(argv[++i]); size_t parsed = 0;
                 frames = std::stoul(value, &parsed);
-                if (parsed != value.size() || frames == 0 || value[0] == '-')
-                    throw std::runtime_error("Frame count must be a positive integer");
-            }
+                if (parsed != value.size() || frames == 0 || value[0] == '-') throw std::runtime_error("Frame count must be a positive integer");
+            } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
         }
+        if (depthCheck && useDx12) throw std::runtime_error("--depth-check is only supported by DX11");
+        if (clearOnly && !useDx12) throw std::runtime_error("--clear-only requires DX12");
+        log << "Backend: " << (useDx12 ? "dx12" : "dx11") << "; scene: reference\n";
         if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
             throw std::runtime_error("SetProcessDpiAwarenessContext failed: " + std::to_string(GetLastError()));
         log << "DPI awareness: per-monitor v2\n";
@@ -134,7 +141,7 @@ int main(int argc, char** argv) {
             RAWINPUTDEVICE mouse{0x01, 0x02, 0, window};
             if (!RegisterRawInputDevices(&mouse, 1, sizeof(mouse)))
                 throw std::runtime_error("RegisterRawInputDevices failed: " + std::to_string(GetLastError()));
-            Dx11 graphics(log);
+            Renderer graphics(log, useDx12, clearOnly);
             RECT client{};
             if (!GetClientRect(window, &client)) throw std::runtime_error("GetClientRect failed");
             graphics.initialize(window, client.right - client.left, client.bottom - client.top);
@@ -257,3 +264,4 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+

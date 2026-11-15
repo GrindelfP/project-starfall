@@ -11,9 +11,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 
-add_executable(starfall WIN32 src/main.cpp src/dx11.cpp src/dx11.h)
+add_executable(starfall WIN32 src/main.cpp src/dx11.cpp src/dx11.h src/dx12.cpp src/dx12.h)
 target_link_options(starfall PRIVATE /ENTRY:mainCRTStartup)
-target_link_libraries(starfall PRIVATE d3d11 dxgi d3dcompiler)
+target_link_libraries(starfall PRIVATE d3d11 d3d12 dxgi dxguid d3dcompiler)
 target_compile_definitions(starfall PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene.hlsl"
@@ -33,4 +33,11 @@ add_test(NAME starfall_input_timing_tests COMMAND starfall_input_timing_tests)
 add_executable(starfall_scene_tests tests/scene_tests.cpp)
 target_include_directories(starfall_scene_tests PRIVATE src)
 add_test(NAME starfall_scene_tests COMMAND starfall_scene_tests)
+
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/camera_tests.cpp")
+    add_executable(starfall_camera_tests tests/camera_tests.cpp)
+    target_include_directories(starfall_camera_tests PRIVATE src)
+    add_test(NAME starfall_camera_tests COMMAND starfall_camera_tests)
+endif()
 
