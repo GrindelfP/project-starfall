@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 #include <ostream>
 #include <span>
+#include <filesystem>
 #include "scene.h"
 
 // Owns all graphics resources; the HWND must outlive this object.
@@ -15,7 +16,11 @@ public:
     void initialize(HWND window, unsigned width, unsigned height);
     void resize(unsigned width, unsigned height);
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool verifyOrder = false);
+    // Development capture: one synchronous readback, never enabled during timing runs.
+    void captureNext(const std::filesystem::path& path) { capturePath_ = path; }
 private:
+    void saveCapture();
+    std::filesystem::path capturePath_;
     void checkDevice(HRESULT result, const char* operation);
     void createTarget(unsigned width, unsigned height);
     void createScene();

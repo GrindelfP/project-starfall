@@ -9,6 +9,7 @@ public:
         if (dx12) dx12_ = std::make_unique<Dx12>(log); else dx11_ = std::make_unique<Dx11>(log);
     }
     void initialize(HWND window, unsigned w, unsigned h) { if (dx12_) dx12_->initialize(window,w,h); else dx11_->initialize(window,w,h); }
+    void captureNext(const std::filesystem::path& path) { if (dx12_) dx12_->captureNext(path); else dx11_->captureNext(path); }
     void resize(unsigned w, unsigned h) { if (dx12_) dx12_->resize(w,h); else dx11_->resize(w,h); }
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool depthCheck) {
         if (dx12_) dx12_->present(objects, view, clearOnly_); else dx11_->present(objects, view, depthCheck);
@@ -18,3 +19,5 @@ private:
     std::unique_ptr<Dx12> dx12_;
     bool clearOnly_;
 };
+
+

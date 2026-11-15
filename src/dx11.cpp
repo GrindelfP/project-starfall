@@ -2,6 +2,7 @@
 #include <d3d11sdklayers.h>
 #include <d3dcompiler.h>
 #include <filesystem>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <iomanip>
@@ -241,7 +242,58 @@ void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
         if (pixels() != normal) throw std::runtime_error("Depth check: reversed submission changed rendered pixels");
         log_ << "Depth check: normal and reversed submission produced identical pixels\n";
     }
+    if (!capturePath_.empty()) saveCapture();
     checkDevice(swapChain_->Present(1, 0), "Present");
+}
+
+void Dx11::saveCapture() {
+    ComPtr<ID3D11Texture2D> source, staging;
+    checkDevice(swapChain_->GetBuffer(0, IID_PPV_ARGS(&source)), "Get capture buffer");
+    D3D11_TEXTURE2D_DESC desc{};
+    source->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.MiscFlags = 0;
+    checkDevice(device_->CreateTexture2D(&desc, nullptr, &staging), "Create capture staging texture");
+    context_->CopyResource(staging.Get(), source.Get());
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    checkDevice(context_->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped), "Map capture texture");
+    std::vector<unsigned char> pixels;
+    try {
+        pixels.resize(static_cast<size_t>(desc.Width) * desc.Height * 4);
+        for (UINT y = 0; y < desc.Height; ++y) {
+            const auto* row = static_cast<const unsigned char*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch;
+            auto* destination = pixels.data() + static_cast<size_t>(y) * desc.Width * 4;
+            for (UINT x = 0; x < desc.Width; ++x) {
+                destination[x * 4] = row[x * 4 + 2];
+                destination[x * 4 + 1] = row[x * 4 + 1];
+                destination[x * 4 + 2] = row[x * 4];
+                destination[x * 4 + 3] = 255;
+            }
+        }
+    } catch (...) { context_->Unmap(staging.Get(), 0); throw; }
+    context_->Unmap(staging.Get(), 0);
+    BITMAPFILEHEADER file{};
+    BITMAPINFOHEADER info{};
+    file.bfType = 0x4d42;
+    file.bfOffBits = sizeof(file) + sizeof(info);
+    file.bfSize = file.bfOffBits + static_cast<DWORD>(pixels.size());
+    info.biSize = sizeof(info);
+    info.biWidth = static_cast<LONG>(desc.Width);
+    info.biHeight = -static_cast<LONG>(desc.Height); // top-down rows
+    info.biPlanes = 1;
+    info.biBitCount = 32;
+    info.biCompression = BI_RGB;
+    if (!capturePath_.parent_path().empty()) std::filesystem::create_directories(capturePath_.parent_path());
+    std::ofstream output(capturePath_, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(&file), sizeof(file));
+    output.write(reinterpret_cast<const char*>(&info), sizeof(info));
+    output.write(reinterpret_cast<const char*>(pixels.data()), static_cast<std::streamsize>(pixels.size()));
+    output.close();
+    if (!output) throw std::runtime_error("Cannot write frame capture: " + capturePath_.string());
+    log_ << "Frame capture: " << capturePath_.string() << '\n';
+    capturePath_.clear();
 }
 
 Dx11::~Dx11() {

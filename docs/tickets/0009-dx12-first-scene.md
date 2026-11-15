@@ -1,7 +1,7 @@
 # 0009 - Native DX12 first scene
 
 Name: Native DX12 first scene
-Status: ready
+Status: done
 Dependencies: 0005-indexed-3d-scene-and-depth.md. Can proceed independently of 0006-0008 after prerequisites.
 
 ## Description
@@ -21,3 +21,7 @@ Create device, queue, swap chain, command allocators/lists, render-target/depth 
 ## Boundaries
 
 No async compute, bindless system, multithreaded command recording, raytracing, mesh shaders or optimization before correctness. This ticket does not require porting the gameplay sandbox.
+
+## Verification
+
+On NVIDIA GeForce GTX 1050, Debug and Release built successfully. DX12 clear and reference geometry completed bounded runs in both configurations. Debug ran with the debug layer and GPU-based validation; no application errors or warnings appeared, and the live-object report showed only the still-held diagnostic device. Resize, minimize, restore and close-while-minimized completed in both configurations. A 1280x720 reference capture matched DX11 byte-for-byte in pixel channels; Debug and Release DX12 captures matched. `--depth-check` remains DX11-specific; DX12 order-independent depth is tested using reversed captures separately.

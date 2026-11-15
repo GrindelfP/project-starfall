@@ -41,3 +41,27 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/camera_tests.cpp")
     add_test(NAME starfall_camera_tests COMMAND starfall_camera_tests)
 endif()
 
+
+find_program(STARFALL_DXC dxc HINTS "$ENV{WindowsSdkDir}/bin/$ENV{WindowsSDKVersion}/x64" REQUIRED)
+foreach(stage IN ITEMS vs ps)
+    if(stage STREQUAL "vs")
+        set(entry VSMain)
+    else()
+        set(entry PSMain)
+    endif()
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene12_${stage}.dxil"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
+        COMMAND "${STARFALL_DXC}" -T ${stage}_6_0 -E ${entry} -Fo "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene12_${stage}.dxil" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/scene12.hlsl"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/scene12.hlsl" VERBATIM)
+    list(APPEND dx12_shaders "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene12_${stage}.dxil")
+endforeach()
+add_custom_target(starfall_dx12_shaders ALL DEPENDS ${dx12_shaders})
+add_dependencies(starfall starfall_dx12_shaders)
+
+add_executable(starfall_ship_tests tests/ship_tests.cpp)
+target_include_directories(starfall_ship_tests PRIVATE src)
+add_test(NAME starfall_ship_tests COMMAND starfall_ship_tests)
+
+add_executable(starfall_asteroid_tests tests/asteroid_tests.cpp)
+target_include_directories(starfall_asteroid_tests PRIVATE src)
+add_test(NAME starfall_asteroid_tests COMMAND starfall_asteroid_tests)

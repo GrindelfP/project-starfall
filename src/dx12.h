@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 #include <ostream>
 #include <span>
+#include <filesystem>
 #include "scene.h"
 
 class Dx12 final {
@@ -13,12 +14,14 @@ public:
     ~Dx12();
     void initialize(HWND window, unsigned width, unsigned height);
     void resize(unsigned width, unsigned height);
+    void captureNext(const std::filesystem::path& path) { capturePath_ = path; }
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool clearOnly = false);
 private:
     void wait();
     void createTargets(unsigned width, unsigned height);
     void createScene();
     void dumpMessages();
+    std::filesystem::path capturePath_;
     std::ostream& log_;
     Microsoft::WRL::ComPtr<ID3D12Device> device_;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue_;
@@ -37,3 +40,4 @@ private:
     D3D12_RECT scissor_{};
     DirectX::XMFLOAT4X4 projection_{};
 };
+
