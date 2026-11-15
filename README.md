@@ -2,7 +2,7 @@
 
 A native Windows C++20 space game and graphics research laboratory using DirectX 11 and DirectX 12.
 
-The first milestone opens a resizable native Win32 window and presents a dark blue DirectX 11 clear on an explicitly selected NVIDIA hardware adapter.
+The first milestone opens a resizable native Win32 window and draws an asymmetric, interpolated-color triangle on a dark blue background using an explicitly selected NVIDIA hardware adapter.
 
 From the repository root, open Windows PowerShell and build both configurations:
 
@@ -24,7 +24,7 @@ Run from any working directory using the executable path. From the repository ro
 .\out\build\debug\starfall.exe --frames 120
 ```
 
-For the manual smoke test, run Debug, confirm the visible dark blue window, and close it with the window close button or Alt+F4. Each run overwrites `dx11-diagnostics.log` beside its executable under `out/build/<configuration>/`. Check the adapter, feature level, frame count, clean shutdown and Debug messages. In the live-object report, the device itself is expected while the diagnostic interfaces are still querying it; render targets, swap chain and context should have been released.
+For the manual smoke test, run Debug, confirm the visible colored triangle, and close it with the window close button or Alt+F4. Each run overwrites `dx11-diagnostics.log` beside its executable under `out/build/<configuration>/`. Check the adapter, feature level, frame count, clean shutdown and Debug messages. In the live-object report, the device itself is expected while the diagnostic interfaces are still querying it; render targets, swap chain and context should have been released. Shader compilation and rebuild instructions are in [shaders](docs/shaders.md).
 
 For a lifecycle check, run each configuration and repeatedly drag the window edges, maximize and restore it, minimize it for several seconds, then restore it and confirm the clear is visible. Close normally, and repeat with the window minimized (for example, from its taskbar menu). Inspect the diagnostics for each client/viewport size, clean shutdown, and, in Debug, errors and unexpected live graphics objects. The process waits for messages while minimized instead of rendering. The process uses per-monitor-v2 DPI awareness, accepts Windows' suggested rectangle when the monitor DPI changes, and obtains actual client pixels for the swap chain and viewport; the initial 1280 x 720 client request is adjusted at the system DPI and may differ on another monitor.
 
