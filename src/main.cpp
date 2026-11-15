@@ -1,5 +1,6 @@
 #include "render_backend.h"
 #include "camera.h"
+#include "ship.h"
 #include "frame_timer.h"
 #include "input_state.h"
 #include <windows.h>
@@ -95,7 +96,7 @@ int main(int argc, char** argv) {
         bool lifecycleTest = false;
         bool reverseOrder = false;
         bool depthCheck = false;
-        bool useDx12 = false, clearOnly = false;
+        bool useDx12 = false, clearOnly = false, referenceScene = false, demo = false;
         for (int i = 1; i < argc; ++i) {
             const std::string arg(argv[i]);
             if (arg == "--backend" && i + 1 < argc) {
@@ -103,8 +104,11 @@ int main(int argc, char** argv) {
                 if (value != "dx11" && value != "dx12") throw std::runtime_error("Backend must be dx11 or dx12");
                 useDx12 = value == "dx12";
             } else if (arg == "--scene" && i + 1 < argc) {
-                if (std::string(argv[++i]) != "reference") throw std::runtime_error("Only the reference scene is available");
-            } else if (arg == "--clear-only") clearOnly = true;
+                const std::string value(argv[++i]);
+                if (value != "reference" && value != "sandbox") throw std::runtime_error("Scene must be reference or sandbox");
+                referenceScene = value == "reference";
+            } else if (arg == "--demo") demo = true;
+            else if (arg == "--clear-only") clearOnly = true;
             else if (arg == "--lifecycle-test") lifecycleTest = true;
             else if (arg == "--reverse-order") reverseOrder = true;
             else if (arg == "--depth-check") { depthCheck = true; frames = 1; }
@@ -112,11 +116,13 @@ int main(int argc, char** argv) {
                 const std::string value(argv[++i]); size_t parsed = 0;
                 frames = std::stoul(value, &parsed);
                 if (parsed != value.size() || frames == 0 || value[0] == '-') throw std::runtime_error("Frame count must be a positive integer");
-            } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
+            } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference|sandbox] [--demo] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
         }
+        if (depthCheck) referenceScene = true;
+        if (demo && referenceScene) throw std::runtime_error("--demo requires sandbox scene");
         if (depthCheck && useDx12) throw std::runtime_error("--depth-check is only supported by DX11");
         if (clearOnly && !useDx12) throw std::runtime_error("--clear-only requires DX12");
-        log << "Backend: " << (useDx12 ? "dx12" : "dx11") << "; scene: reference\n";
+        log << "Backend: " << (useDx12 ? "dx12" : "dx11") << "; scene: " << (referenceScene ? "reference" : "sandbox") << (demo ? "; demo" : "") << '\n';
         if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
             throw std::runtime_error("SetProcessDpiAwarenessContext failed: " + std::to_string(GetLastError()));
         log << "DPI awareness: per-monitor v2\n";
@@ -149,6 +155,8 @@ int main(int argc, char** argv) {
             ShowWindow(window, SW_SHOW);
             UpdateWindow(window);
             Camera camera;
+            Ship ship;
+            bool chase = !referenceScene;
             auto objects = scene::referenceObjects;
             if (reverseOrder) std::reverse(objects.begin(), objects.end());
             log << "Reference draw order: " << (reverseOrder ? "reversed" : "normal") << '\n';
@@ -217,8 +225,20 @@ int main(int argc, char** argv) {
                     state.sizeChanged = false;
                 }
                 const double dt = state.timer.tick(FrameTimer::Clock::now());
+                if (state.input.pressed('C') && !referenceScene) {
+                    chase = !chase;
+                    state.input.discardMouse();
+                }
                 if (state.input.pressed('R')) {
                     camera.reset();
+                    ship.reset();
+                } else if (chase) {
+                    const float step = demo ? 1.0f / 60.0f : static_cast<float>(dt);
+                    ship.update(demo ? 1.0f : static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
+                        demo ? 0.35f : static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
+                        demo ? 0.12f : static_cast<float>(state.input.held(VK_UP)) - static_cast<float>(state.input.held(VK_DOWN)),
+                        demo ? 0.0f : static_cast<float>(state.input.held(VK_SPACE)) - static_cast<float>(state.input.held(VK_CONTROL)),
+                        !demo && state.input.held(VK_SHIFT), step);
                 } else {
                     if (state.captured) camera.look(static_cast<float>(state.input.mouseX()), static_cast<float>(state.input.mouseY()));
                     camera.move(static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
@@ -237,7 +257,8 @@ int main(int argc, char** argv) {
                     return any ? result.str() : std::wstring(L"-");
                 };
                 std::wostringstream title;
-                title << std::fixed << std::setprecision(2)
+                title << (referenceScene ? L"Reference" : (chase ? L"Flight (C: free, R: reset)" : L"Free (C: chase, R: reset)")) << L" | "
+                      << std::fixed << std::setprecision(2)
                       << L"Starfall | dt " << dt * 1000.0 << L" ms | update " << updateMs
                       << L" ms | submit/present " << submissionMs << L" ms | held "
                       << keys([&](auto key) { return state.input.held(key); }) << L" | press "
@@ -247,7 +268,13 @@ int main(int argc, char** argv) {
                       << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
                 SetWindowTextW(window, title.str().c_str());
                 const auto submitStart = FrameTimer::Clock::now();
-                graphics.present(objects, camera.view(), depthCheck);
+                if (referenceScene) {
+                    graphics.present(objects, camera.view(), depthCheck);
+                } else {
+                    auto sandboxObjects = ship.objects();
+                    sandboxObjects.insert(sandboxObjects.end(), objects.begin(), objects.end());
+                    graphics.present(sandboxObjects, chase ? ship.chaseView() : camera.view(), depthCheck);
+                }
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
                 ++presented;
                 if (frames && presented >= frames) running = false;

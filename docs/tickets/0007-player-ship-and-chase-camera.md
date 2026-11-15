@@ -1,7 +1,7 @@
 # 0007 - Player ship and chase camera
 
 Name: Player ship and chase camera
-Status: ready
+Status: implementation complete; manual flight validation pending
 Dependencies: 0006-free-debug-camera.md.
 
 ## Description
@@ -21,3 +21,8 @@ Implement only the approved movement model, visible orientation feedback and a c
 ## Boundaries
 
 No combat, drone AI, waves, imported ship art, rigid-body physics dependency or camera-obstacle avoidance system.
+
+## Implementation evidence
+
+See `docs/flight.md` for controls, tuning and verification scope. Interactive flight, camera switching, focus transitions and visual readability remain to be manually validated.
+
