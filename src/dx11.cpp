@@ -75,15 +75,47 @@ void Dx11::initialize(HWND window, unsigned width, unsigned height) {
     log_ << "DX11 debug layer enabled\n";
 #endif
     check(factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER), "MakeWindowAssociation");
+    createTarget(width, height);
+}
+
+void Dx11::checkDevice(HRESULT result, const char* operation) {
+    if (FAILED(result)) {
+        std::ostringstream message;
+        message << operation << " failed (HRESULT 0x" << std::hex << std::uppercase
+                << static_cast<unsigned long>(result) << ")";
+        if (device_) {
+            const HRESULT reason = device_->GetDeviceRemovedReason();
+            if (FAILED(reason)) message << "; device removal reason 0x" << static_cast<unsigned long>(reason);
+        }
+        throw std::runtime_error(message.str());
+    }
+}
+
+void Dx11::createTarget(unsigned width, unsigned height) {
     ComPtr<ID3D11Texture2D> backBuffer;
-    check(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)), "GetBuffer");
-    check(device_->CreateRenderTargetView(backBuffer.Get(), nullptr, &target_), "CreateRenderTargetView");
+    checkDevice(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)), "GetBuffer");
+    checkDevice(device_->CreateRenderTargetView(backBuffer.Get(), nullptr, &target_), "CreateRenderTargetView");
+    D3D11_VIEWPORT viewport{};
+    viewport.Width = static_cast<float>(width);
+    viewport.Height = static_cast<float>(height);
+    viewport.MaxDepth = 1.0f;
+    context_->RSSetViewports(1, &viewport);
+    log_ << "Client/viewport: " << width << " x " << height << '\n';
+    log_.flush();
+}
+
+void Dx11::resize(unsigned width, unsigned height) {
+    if (!width || !height) return;
+    context_->OMSetRenderTargets(0, nullptr, nullptr);
+    target_.Reset();
+    checkDevice(swapChain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0), "ResizeBuffers");
+    createTarget(width, height);
 }
 
 void Dx11::present() {
     constexpr float clear[] = { 0.025f, 0.12f, 0.25f, 1.0f };
     context_->ClearRenderTargetView(target_.Get(), clear);
-    check(swapChain_->Present(1, 0), "Present");
+    checkDevice(swapChain_->Present(1, 0), "Present");
 }
 
 Dx11::~Dx11() {
