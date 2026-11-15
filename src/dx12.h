@@ -6,6 +6,8 @@
 #include <ostream>
 #include <span>
 #include <filesystem>
+#include <vector>
+#include "gpu_sample.h"
 #include "scene.h"
 
 class Dx12 final {
@@ -14,9 +16,17 @@ public:
     ~Dx12();
     void initialize(HWND window, unsigned width, unsigned height);
     void resize(unsigned width, unsigned height);
+    void enableTiming();
+    std::vector<GpuSample> takeTimings();
+    void setVsync(bool enabled) { vsync_ = enabled; }
     void captureNext(const std::filesystem::path& path) { capturePath_ = path; }
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool clearOnly = false);
 private:
+    Microsoft::WRL::ComPtr<ID3D12QueryHeap> timestamps_;
+    Microsoft::WRL::ComPtr<ID3D12Resource> timestampReadback_;
+    UINT64 timestampFrequency_ = 0, timingFrame_ = 0;
+    std::vector<GpuSample> samples_;
+    bool vsync_ = true;
     void wait();
     void createTargets(unsigned width, unsigned height);
     void createScene();

@@ -15,6 +15,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include <optional>
+#include <dxgi1_4.h>
 
 namespace {
 struct WindowState {
@@ -101,6 +104,7 @@ int main(int argc, char** argv) {
         bool depthCheck = false;
         bool useDx12 = false, clearOnly = false, referenceScene = false, demo = false;
         std::filesystem::path capturePath;
+        std::filesystem::path benchmarkPath;
         std::uint32_t seed = AsteroidField::defaultSeed;
         for (int i = 1; i < argc; ++i) {
             const std::string arg(argv[i]);
@@ -113,6 +117,7 @@ int main(int argc, char** argv) {
                 if (value != "reference" && value != "sandbox") throw std::runtime_error("Scene must be reference or sandbox");
                 referenceScene = value == "reference";
             } else if (arg == "--capture" && i + 1 < argc) capturePath = argv[++i];
+            else if (arg == "--benchmark" && i + 1 < argc) benchmarkPath = argv[++i];
             else if (arg == "--seed" && i + 1 < argc) {
                 const std::string value(argv[++i]); size_t parsed = 0;
                 const auto number = std::stoull(value, &parsed, 10);
@@ -130,6 +135,11 @@ int main(int argc, char** argv) {
                 if (parsed != value.size() || frames == 0 || value[0] == '-') throw std::runtime_error("Frame count must be a positive integer");
             } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference|sandbox] [--demo] [--seed uint32] [--capture path] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
         }
+        if (!benchmarkPath.empty()) {
+            if (demo || depthCheck || clearOnly || lifecycleTest || reverseOrder || frames || !capturePath.empty())
+                throw std::runtime_error("Benchmark cannot be combined with diagnostic or scene options");
+            referenceScene = true;
+        }
         if (depthCheck) referenceScene = true;
         if (demo && referenceScene) throw std::runtime_error("--demo requires sandbox scene");
         if (depthCheck && useDx12) throw std::runtime_error("--depth-check is only supported by DX11");
@@ -145,8 +155,8 @@ int main(int argc, char** argv) {
         wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         wc.lpszClassName = L"StarfallWindow";
         if (!RegisterClassW(&wc)) throw std::runtime_error("RegisterClassW failed: " + std::to_string(GetLastError()));
-        constexpr DWORD style = WS_OVERLAPPEDWINDOW;
-        RECT rect{0, 0, 1280, 720};
+        const DWORD style = benchmarkPath.empty() ? WS_OVERLAPPEDWINDOW : WS_POPUP;
+        RECT rect{0, 0, benchmarkPath.empty() ? 1280L : 1920L, benchmarkPath.empty() ? 720L : 1080L};
         if (!AdjustWindowRectExForDpi(&rect, style, FALSE, 0, GetDpiForSystem()))
             throw std::runtime_error("AdjustWindowRectExForDpi failed");
         WindowState state;
@@ -163,6 +173,26 @@ int main(int argc, char** argv) {
             RECT client{};
             if (!GetClientRect(window, &client)) throw std::runtime_error("GetClientRect failed");
             graphics.initialize(window, client.right - client.left, client.bottom - client.top);
+            if (!benchmarkPath.empty()) {
+                if (client.right != 1920 || client.bottom != 1080) throw std::runtime_error("Benchmark client is not 1920x1080");
+                graphics.setVsync(false); graphics.enableTiming();
+                Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+                if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+                    for (UINT i = 0;; ++i) {
+                        Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+                        if (factory->EnumAdapters1(i, &adapter) == DXGI_ERROR_NOT_FOUND) break;
+                        DXGI_ADAPTER_DESC1 desc{}; adapter->GetDesc1(&desc);
+                        if (desc.VendorId != 0x10de || (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) continue;
+                        log << "Dedicated physical VRAM bytes: " << desc.DedicatedVideoMemory << '\n';
+                        Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+                        DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+                        if (SUCCEEDED(adapter.As(&adapter3)) && SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+                            log << "Local memory budget bytes: " << info.Budget << "; process usage bytes: " << info.CurrentUsage << '\n';
+                        else log << "Local memory budget/usage unavailable\n";
+                        break;
+                    }
+                }
+            }
             if (!capturePath.empty()) graphics.captureNext(capturePath);
             state.sizeChanged = false;
             ShowWindow(window, SW_SHOW);
@@ -196,6 +226,10 @@ int main(int argc, char** argv) {
             if (lifecycleTest && !SetTimer(window, 1, 100, nullptr))
                 throw std::runtime_error("SetTimer failed");
             double submissionMs = 0.0;
+            struct Sample { double frame, update, submit; std::optional<double> gpu; bool measured; };
+            std::vector<Sample> samples;
+            auto benchmarkStart = FrameTimer::Clock::now();
+            auto previousStart = benchmarkStart;
             while (running) {
                 const auto updateStart = FrameTimer::Clock::now();
                 state.input.beginFrame();
@@ -228,7 +262,7 @@ int main(int argc, char** argv) {
                     DispatchMessageW(&message);
                 }
                 if (!running) break;
-                if (state.minimized || !state.focused) {
+                if (state.minimized || (!state.focused && benchmarkPath.empty())) {
                     state.timer.reset();
                     if (!WaitMessage()) throw std::runtime_error("WaitMessage failed");
                     continue;
@@ -237,6 +271,7 @@ int main(int argc, char** argv) {
                     if (!GetClientRect(window, &client)) throw std::runtime_error("GetClientRect failed");
                     const auto width = client.right - client.left;
                     const auto height = client.bottom - client.top;
+                    if (!benchmarkPath.empty() && (width != 1920 || height != 1080)) throw std::runtime_error("Benchmark viewport changed");
                     if (!width || !height) {
                         if (!WaitMessage()) throw std::runtime_error("WaitMessage failed");
                         continue;
@@ -287,6 +322,7 @@ int main(int argc, char** argv) {
                 }
                 const auto updateEnd = FrameTimer::Clock::now();
                 const double updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+                if (benchmarkPath.empty()) {
                 auto keys = [&](auto predicate) {
                     std::wostringstream result;
                     bool any = false;
@@ -306,6 +342,7 @@ int main(int argc, char** argv) {
                       << state.input.mouseX() << L"," << state.input.mouseY()
                       << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
                 SetWindowTextW(window, title.str().c_str());
+                }
                 const auto submitStart = FrameTimer::Clock::now();
                 if (referenceScene) {
                     graphics.present(objects, camera.view(), depthCheck);
@@ -315,8 +352,29 @@ int main(int argc, char** argv) {
                     graphics.present(sandboxObjects, chase ? ship.chaseView() : camera.view(), depthCheck);
                 }
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
+                if (!benchmarkPath.empty()) {
+                    const double elapsed = std::chrono::duration<double>(updateStart - benchmarkStart).count();
+                    samples.push_back({std::chrono::duration<double, std::milli>(updateStart - previousStart).count(), updateMs, submissionMs, {}, elapsed >= 2.0 && elapsed < 7.0});
+                    previousStart = updateStart;
+                    for (const auto& result : graphics.takeTimings())
+                        if (result.frame < samples.size() && result.valid) samples[static_cast<size_t>(result.frame)].gpu = result.milliseconds;
+                    if (elapsed >= 7.0) running = false;
+                }
                 ++presented;
                 if (frames && presented >= frames) running = false;
+            }
+            if (!benchmarkPath.empty()) {
+                for (const auto& result : graphics.takeTimings())
+                    if (result.frame < samples.size() && result.valid) samples[static_cast<size_t>(result.frame)].gpu = result.milliseconds;
+                if (!benchmarkPath.parent_path().empty()) std::filesystem::create_directories(benchmarkPath.parent_path());
+                std::ofstream csv(benchmarkPath); csv << "frame,frame_ms,update_ms,submission_ms,gpu_ms\n" << std::setprecision(10);
+                for (size_t i = 0; i < samples.size(); ++i) if (samples[i].measured) {
+                    const auto& s = samples[i]; csv << i << ',' << s.frame << ',' << s.update << ',' << s.submit << ',';
+                    if (s.gpu) csv << *s.gpu;
+                    csv << '\n';
+                }
+                if (!csv) throw std::runtime_error("Cannot write benchmark CSV");
+                log << "Benchmark raw CSV: " << benchmarkPath.string() << '\n';
             }
             log << "Presented frames: " << presented << '\n';
         } catch (...) { DestroyWindow(window); UnregisterClassW(wc.lpszClassName, instance); throw; }

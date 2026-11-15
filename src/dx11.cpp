@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 using Microsoft::WRL::ComPtr;
 
@@ -189,7 +190,39 @@ void Dx11::resize(unsigned width, unsigned height) {
     createTarget(width, height);
 }
 
+void Dx11::enableTiming() {
+    D3D11_QUERY_DESC desc{};
+    for (auto& slot : queries_) {
+        desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT; checkDevice(device_->CreateQuery(&desc, &slot.disjoint), "Create disjoint query");
+        desc.Query = D3D11_QUERY_TIMESTAMP; checkDevice(device_->CreateQuery(&desc, &slot.start), "Create start query");
+        checkDevice(device_->CreateQuery(&desc, &slot.end), "Create end query");
+    }
+    timing_ = true;
+}
+void Dx11::pollTimings() {
+    for (auto& slot : queries_) if (slot.pending) {
+        D3D11_QUERY_DATA_TIMESTAMP_DISJOINT d{}; UINT64 start = 0, end = 0;
+        const auto a = context_->GetData(slot.disjoint.Get(), &d, sizeof(d), D3D11_ASYNC_GETDATA_DONOTFLUSH);
+        const auto b = context_->GetData(slot.start.Get(), &start, sizeof(start), D3D11_ASYNC_GETDATA_DONOTFLUSH);
+        const auto c = context_->GetData(slot.end.Get(), &end, sizeof(end), D3D11_ASYNC_GETDATA_DONOTFLUSH);
+        checkDevice(a, "Get disjoint query"); checkDevice(b, "Get start query"); checkDevice(c, "Get end query");
+        if (a == S_OK && b == S_OK && c == S_OK) {
+            const bool valid = !d.Disjoint && d.Frequency && end >= start;
+            samples_.push_back({slot.frame, valid ? 1000.0 * (end - start) / d.Frequency : 0.0, valid});
+            slot.pending = false;
+        }
+    }
+}
+std::vector<GpuSample> Dx11::takeTimings() { if (timing_) pollTimings(); return std::exchange(samples_, {}); }
+
 void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool verifyOrder) {
+    QuerySlot* query = nullptr;
+    if (timing_) {
+        pollTimings(); auto& slot = queries_[timingFrame_ % queries_.size()];
+        if (!slot.pending) { query = &slot; slot.frame = timingFrame_; context_->Begin(slot.disjoint.Get()); context_->End(slot.start.Get()); }
+        else samples_.push_back({timingFrame_, 0.0, false});
+        ++timingFrame_;
+    }
     constexpr float clear[] = { 0.025f, 0.12f, 0.25f, 1.0f };
     context_->ClearRenderTargetView(target_.Get(), clear);
     context_->ClearDepthStencilView(depthTarget_.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -218,6 +251,7 @@ void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
         context_->DrawIndexed(static_cast<UINT>(scene::cubeIndices.size()), 0, 0);
     };
     for (const auto& object : objects) draw(object);
+    if (query) { context_->End(query->end.Get()); context_->End(query->disjoint.Get()); query->pending = true; }
     if (verifyOrder) {
         ComPtr<ID3D11Texture2D> backBuffer, staging;
         checkDevice(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)), "GetBuffer for depth check");
@@ -243,7 +277,7 @@ void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
         log_ << "Depth check: normal and reversed submission produced identical pixels\n";
     }
     if (!capturePath_.empty()) saveCapture();
-    checkDevice(swapChain_->Present(1, 0), "Present");
+    checkDevice(swapChain_->Present(vsync_ ? 1 : 0, 0), "Present");
 }
 
 void Dx11::saveCapture() {
@@ -298,6 +332,7 @@ void Dx11::saveCapture() {
 
 Dx11::~Dx11() {
     if (context_) { context_->ClearState(); context_->Flush(); }
+    for (auto& query : queries_) { query.disjoint.Reset(); query.start.Reset(); query.end.Reset(); }
     target_.Reset();
     depthTarget_.Reset(); indexBuffer_.Reset(); constants_.Reset(); vertexBuffer_.Reset(); inputLayout_.Reset(); vertexShader_.Reset(); pixelShader_.Reset();
     rasterizer_.Reset(); blend_.Reset(); depth_.Reset();

@@ -11,6 +11,9 @@ public:
     void initialize(HWND window, unsigned w, unsigned h) { if (dx12_) dx12_->initialize(window,w,h); else dx11_->initialize(window,w,h); }
     void captureNext(const std::filesystem::path& path) { if (dx12_) dx12_->captureNext(path); else dx11_->captureNext(path); }
     void resize(unsigned w, unsigned h) { if (dx12_) dx12_->resize(w,h); else dx11_->resize(w,h); }
+    void enableTiming() { if (dx12_) dx12_->enableTiming(); else dx11_->enableTiming(); }
+    std::vector<GpuSample> takeTimings() { return dx12_ ? dx12_->takeTimings() : dx11_->takeTimings(); }
+    void setVsync(bool enabled) { if (dx12_) dx12_->setVsync(enabled); else dx11_->setVsync(enabled); }
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool depthCheck) {
         if (dx12_) dx12_->present(objects, view, clearOnly_); else dx11_->present(objects, view, depthCheck);
     }

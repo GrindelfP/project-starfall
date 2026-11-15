@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cstring>
 #include <algorithm>
+#include <utility>
 using Microsoft::WRL::ComPtr;
 namespace {
 void check(HRESULT hr, const char* what) {
@@ -158,6 +159,16 @@ void Dx12::resize(unsigned width, unsigned height) {
     check(swap_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0), "ResizeBuffers");
     createTargets(width, height);
 }
+void Dx12::enableTiming() {
+    D3D12_QUERY_HEAP_DESC q{}; q.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP; q.Count = 2;
+    check(device_->CreateQueryHeap(&q, IID_PPV_ARGS(&timestamps_)), "Create timestamp heap");
+    D3D12_HEAP_PROPERTIES heap{}; heap.Type = D3D12_HEAP_TYPE_READBACK;
+    D3D12_RESOURCE_DESC buffer{}; buffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; buffer.Width = 2 * sizeof(UINT64);
+    buffer.Height = 1; buffer.DepthOrArraySize = 1; buffer.MipLevels = 1; buffer.SampleDesc.Count = 1; buffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    check(device_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&timestampReadback_)), "Create timestamp readback");
+    check(queue_->GetTimestampFrequency(&timestampFrequency_), "GetTimestampFrequency");
+}
+std::vector<GpuSample> Dx12::takeTimings() { return std::exchange(samples_, {}); }
 void Dx12::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool clearOnly) {
     check(allocator_->Reset(), "Reset allocator");
     check(commands_->Reset(allocator_.Get(), pipeline_.Get()), "Reset command list");
@@ -166,6 +177,7 @@ void Dx12::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
     barrier.Transition.pResource = targets_[frame].Get(); barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT; barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     commands_->ResourceBarrier(1, &barrier);
+    if (timestamps_) commands_->EndQuery(timestamps_.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0);
     auto rtv = rtvHeap_->GetCPUDescriptorHandleForHeapStart(); rtv.ptr += frame * rtvStride_;
     constexpr float clear[] = {0.025f, 0.12f, 0.25f, 1.0f}; commands_->ClearRenderTargetView(rtv, clear, 0, nullptr);
     if (!clearOnly) {
@@ -185,6 +197,7 @@ void Dx12::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
             commands_->DrawIndexedInstanced(static_cast<UINT>(scene::cubeIndices.size()), 1, 0, 0, 0);
         }
     }
+    if (timestamps_) { commands_->EndQuery(timestamps_.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 1); commands_->ResolveQueryData(timestamps_.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, timestampReadback_.Get(), 0); }
     ComPtr<ID3D12Resource> readback;
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{}; UINT64 bytes = 0;
     if (!capturePath_.empty()) {
@@ -204,7 +217,14 @@ void Dx12::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX vi
     } else barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; commands_->ResourceBarrier(1, &barrier);
     check(commands_->Close(), "Close command list"); ID3D12CommandList* lists[] = {commands_.Get()}; queue_->ExecuteCommandLists(1, lists);
-    check(swap_->Present(1, 0), "Present"); wait();
+    check(swap_->Present(vsync_ ? 1 : 0, 0), "Present"); wait();
+    if (timestamps_) {
+        UINT64* values = nullptr; D3D12_RANGE range{0, 2 * sizeof(UINT64)};
+        check(timestampReadback_->Map(0, &range, reinterpret_cast<void**>(&values)), "Map timestamps");
+        const bool valid = timestampFrequency_ && values[1] >= values[0];
+        samples_.push_back({timingFrame_++, valid ? 1000.0 * (values[1] - values[0]) / timestampFrequency_ : 0.0, valid});
+        D3D12_RANGE noWrite{0, 0}; timestampReadback_->Unmap(0, &noWrite);
+    }
     if (readback) {
         const UINT width = footprint.Footprint.Width, height = footprint.Footprint.Height;
         BITMAPFILEHEADER file{}; BITMAPINFOHEADER info{};
@@ -243,6 +263,7 @@ void Dx12::dumpMessages() {
 Dx12::~Dx12() {
     try { if (queue_ && fence_ && event_) wait(); } catch (const std::exception& e) { log_ << "Shutdown wait: " << e.what() << '\n'; }
     for (auto& target : targets_) target.Reset(); depth_.Reset(); vertices_.Reset(); indices_.Reset();
+    timestamps_.Reset(); timestampReadback_.Reset();
     pipeline_.Reset(); root_.Reset(); commands_.Reset(); allocator_.Reset(); rtvHeap_.Reset(); dsvHeap_.Reset(); swap_.Reset(); fence_.Reset(); queue_.Reset();
 #ifdef _DEBUG
     if (device_) {

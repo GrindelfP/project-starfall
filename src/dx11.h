@@ -6,6 +6,9 @@
 #include <ostream>
 #include <span>
 #include <filesystem>
+#include <array>
+#include <vector>
+#include "gpu_sample.h"
 #include "scene.h"
 
 // Owns all graphics resources; the HWND must outlive this object.
@@ -15,10 +18,19 @@ public:
     ~Dx11();
     void initialize(HWND window, unsigned width, unsigned height);
     void resize(unsigned width, unsigned height);
+    void enableTiming();
+    std::vector<GpuSample> takeTimings();
+    void setVsync(bool enabled) { vsync_ = enabled; }
     void present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view, bool verifyOrder = false);
     // Development capture: one synchronous readback, never enabled during timing runs.
     void captureNext(const std::filesystem::path& path) { capturePath_ = path; }
 private:
+    struct QuerySlot { Microsoft::WRL::ComPtr<ID3D11Query> disjoint, start, end; unsigned long long frame = 0; bool pending = false; };
+    std::array<QuerySlot, 64> queries_{};
+    std::vector<GpuSample> samples_;
+    unsigned long long timingFrame_ = 0;
+    bool timing_ = false, vsync_ = true;
+    void pollTimings();
     void saveCapture();
     std::filesystem::path capturePath_;
     void checkDevice(HRESULT result, const char* operation);
