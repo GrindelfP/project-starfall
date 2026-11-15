@@ -1,0 +1,9 @@
+# Reference scene and coordinate conventions
+
+The shared CPU data in `src/scene.h` contains a unit indexed cube and three deterministic objects. Each object has scale, Euler rotation (radians), translation (metres), and RGBA color. The reference camera is at the origin looking along +Z. The orange cube overlaps the blue cube; the green elongated cube exercises nonuniform scale and rotation. Face-dependent color is a visual cue, not a lighting model. `Dx11::present` accepts a span of objects and a view matrix so the same scene data can be consumed by another backend or a camera.
+
+Coordinates are left-handed: +X right, +Y up, +Z forward; world units are metres. DirectXMath uses row vectors and the object transform is `scale * rotation * translation`; vertex positions are transformed by `world * view * projection`. The CPU stores matrices in row-major order, HLSL declares `row_major`, and `mul(vector, matrix)` consumes the upload directly without transposition. The perspective has a 45-degree vertical field of view, a 0.1 m near plane, 100 m far plane, and Direct3D normalized depth 0 to 1. Aspect ratio is client width / height and is recalculated whenever nonzero client dimensions change.
+
+Cube faces have outward winding and appear clockwise from outside after projection. DX11 uses back-face culling with clockwise front faces, a D24S8 depth buffer cleared to 1, and a writable LESS depth test. The depth view is released and recreated with the swap-chain target and viewport on resize. `--reverse-order` reverses object submission for visual depth verification; it does not change transforms or colors.
+
+`starfall_scene_tests` checks scale/rotation/translation order, the near and far depth mappings, aspect scaling, and mesh index bounds. Debug and Release CMake builds and both CTest suites passed on 2026-11-15. Visual and runtime diagnostic results are recorded once verified.

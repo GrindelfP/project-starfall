@@ -98,36 +98,32 @@ void Dx11::initialize(HWND window, unsigned width, unsigned height) {
 #endif
     check(factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER), "MakeWindowAssociation");
     createTarget(width, height);
-    createTriangle();
+    createScene();
 }
 
-void Dx11::createTriangle() {
+void Dx11::createScene() {
     wchar_t executable[32768]{};
     const DWORD length = GetModuleFileNameW(nullptr, executable, static_cast<DWORD>(std::size(executable)));
     if (!length || length == std::size(executable)) throw std::runtime_error("Cannot resolve executable path for shaders");
-    const auto path = std::filesystem::path(executable).parent_path() / L"shaders" / L"triangle.hlsl";
+    const auto path = std::filesystem::path(executable).parent_path() / L"shaders" / L"scene.hlsl";
     const auto vs = compileShader(path, "VSMain", "vs_5_0");
     const auto ps = compileShader(path, "PSMain", "ps_5_0");
     checkDevice(device_->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(), nullptr, &vertexShader_), "CreateVertexShader");
     checkDevice(device_->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &pixelShader_), "CreatePixelShader");
     constexpr D3D11_INPUT_ELEMENT_DESC elements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
-    checkDevice(device_->CreateInputLayout(elements, static_cast<UINT>(std::size(elements)),
-        vs->GetBufferPointer(), vs->GetBufferSize(), &inputLayout_), "CreateInputLayout");
-    struct Vertex { float x, y, r, g, b; };
-    constexpr Vertex vertices[] = {
-        { -0.72f, -0.58f, 1.0f, 0.15f, 0.08f },
-        {  0.64f, -0.43f, 0.10f, 1.0f, 0.20f },
-        { -0.18f,  0.75f, 0.15f, 0.35f, 1.0f }
-    };
+    checkDevice(device_->CreateInputLayout(elements, static_cast<UINT>(std::size(elements)), vs->GetBufferPointer(), vs->GetBufferSize(), &inputLayout_), "CreateInputLayout");
     D3D11_BUFFER_DESC buffer{};
-    buffer.ByteWidth = sizeof(vertices); buffer.Usage = D3D11_USAGE_IMMUTABLE; buffer.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    D3D11_SUBRESOURCE_DATA data{}; data.pSysMem = vertices;
-    checkDevice(device_->CreateBuffer(&buffer, &data, &vertexBuffer_), "CreateBuffer");
+    buffer.ByteWidth = sizeof(scene::cubeVertices); buffer.Usage = D3D11_USAGE_IMMUTABLE; buffer.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA data{}; data.pSysMem = scene::cubeVertices.data();
+    checkDevice(device_->CreateBuffer(&buffer, &data, &vertexBuffer_), "Create vertex buffer");
+    buffer.ByteWidth = sizeof(scene::cubeIndices); buffer.BindFlags = D3D11_BIND_INDEX_BUFFER; data.pSysMem = scene::cubeIndices.data();
+    checkDevice(device_->CreateBuffer(&buffer, &data, &indexBuffer_), "Create index buffer");
+    buffer.ByteWidth = sizeof(DirectX::XMFLOAT4X4) + sizeof(DirectX::XMFLOAT4); buffer.Usage = D3D11_USAGE_DEFAULT; buffer.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    checkDevice(device_->CreateBuffer(&buffer, nullptr, &constants_), "Create constant buffer");
     D3D11_RASTERIZER_DESC raster{};
-    raster.FillMode = D3D11_FILL_SOLID; raster.CullMode = D3D11_CULL_NONE; raster.DepthClipEnable = TRUE;
+    raster.FillMode = D3D11_FILL_SOLID; raster.CullMode = D3D11_CULL_BACK; raster.DepthClipEnable = TRUE;
     checkDevice(device_->CreateRasterizerState(&raster, &rasterizer_), "CreateRasterizerState");
     D3D11_BLEND_DESC blend{};
     auto& targetBlend = blend.RenderTarget[0];
@@ -138,8 +134,8 @@ void Dx11::createTriangle() {
     targetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     checkDevice(device_->CreateBlendState(&blend, &blend_), "CreateBlendState");
     D3D11_DEPTH_STENCIL_DESC depth{};
-    depth.DepthEnable = FALSE; depth.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    depth.DepthFunc = D3D11_COMPARISON_ALWAYS; depth.StencilEnable = FALSE;
+    depth.DepthEnable = TRUE; depth.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depth.DepthFunc = D3D11_COMPARISON_LESS; depth.StencilEnable = FALSE;
     depth.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK; depth.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
     depth.FrontFace = { D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_COMPARISON_ALWAYS };
     depth.BackFace = depth.FrontFace;
@@ -164,6 +160,14 @@ void Dx11::createTarget(unsigned width, unsigned height) {
     ComPtr<ID3D11Texture2D> backBuffer;
     checkDevice(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)), "GetBuffer");
     checkDevice(device_->CreateRenderTargetView(backBuffer.Get(), nullptr, &target_), "CreateRenderTargetView");
+    D3D11_TEXTURE2D_DESC depthDesc{};
+    depthDesc.Width = width; depthDesc.Height = height; depthDesc.MipLevels = 1; depthDesc.ArraySize = 1;
+    depthDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; depthDesc.SampleDesc.Count = 1;
+    depthDesc.Usage = D3D11_USAGE_DEFAULT; depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    ComPtr<ID3D11Texture2D> depthTexture;
+    checkDevice(device_->CreateTexture2D(&depthDesc, nullptr, &depthTexture), "Create depth texture");
+    checkDevice(device_->CreateDepthStencilView(depthTexture.Get(), nullptr, &depthTarget_), "Create depth view");
+    DirectX::XMStoreFloat4x4(&projection_, scene::projection(width, height));
     D3D11_VIEWPORT viewport{};
     viewport.Width = static_cast<float>(width);
     viewport.Height = static_cast<float>(height);
@@ -177,33 +181,46 @@ void Dx11::resize(unsigned width, unsigned height) {
     if (!width || !height) return;
     context_->OMSetRenderTargets(0, nullptr, nullptr);
     target_.Reset();
+    depthTarget_.Reset();
     checkDevice(swapChain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0), "ResizeBuffers");
     createTarget(width, height);
 }
 
-void Dx11::present() {
+void Dx11::present(std::span<const scene::Object> objects, DirectX::FXMMATRIX view) {
     constexpr float clear[] = { 0.025f, 0.12f, 0.25f, 1.0f };
     context_->ClearRenderTargetView(target_.Get(), clear);
+    context_->ClearDepthStencilView(depthTarget_.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     ID3D11RenderTargetView* target = target_.Get();
-    context_->OMSetRenderTargets(1, &target, nullptr);
+    context_->OMSetRenderTargets(1, &target, depthTarget_.Get());
     context_->OMSetBlendState(blend_.Get(), nullptr, 0xffffffff);
     context_->OMSetDepthStencilState(depth_.Get(), 0);
     context_->RSSetState(rasterizer_.Get());
     context_->IASetInputLayout(inputLayout_.Get());
     context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D11Buffer* buffer = vertexBuffer_.Get();
-    constexpr UINT stride = 5 * sizeof(float), offset = 0;
+    constexpr UINT stride = sizeof(scene::Vertex), offset = 0;
     context_->IASetVertexBuffers(0, 1, &buffer, &stride, &offset);
+    context_->IASetIndexBuffer(indexBuffer_.Get(), DXGI_FORMAT_R16_UINT, 0);
+    ID3D11Buffer* constants = constants_.Get();
+    context_->VSSetConstantBuffers(0, 1, &constants);
     context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
     context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
-    context_->Draw(3, 0);
+    struct Constants { DirectX::XMFLOAT4X4 wvp; DirectX::XMFLOAT4 color; };
+    static_assert(sizeof(Constants) == 80);
+    for (const auto& object : objects) {
+        Constants values{};
+        DirectX::XMStoreFloat4x4(&values.wvp, scene::world(object) * view * DirectX::XMLoadFloat4x4(&projection_));
+        values.color = object.color;
+        context_->UpdateSubresource(constants_.Get(), 0, nullptr, &values, 0, 0);
+        context_->DrawIndexed(static_cast<UINT>(scene::cubeIndices.size()), 0, 0);
+    }
     checkDevice(swapChain_->Present(1, 0), "Present");
 }
 
 Dx11::~Dx11() {
     if (context_) { context_->ClearState(); context_->Flush(); }
     target_.Reset();
-    vertexBuffer_.Reset(); inputLayout_.Reset(); vertexShader_.Reset(); pixelShader_.Reset();
+    depthTarget_.Reset(); indexBuffer_.Reset(); constants_.Reset(); vertexBuffer_.Reset(); inputLayout_.Reset(); vertexShader_.Reset(); pixelShader_.Reset();
     rasterizer_.Reset(); blend_.Reset(); depth_.Reset();
     swapChain_.Reset();
     context_.Reset();
@@ -233,3 +250,5 @@ Dx11::~Dx11() {
     }
 #endif
 }
+
+

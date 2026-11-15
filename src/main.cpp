@@ -2,6 +2,7 @@
 #include "frame_timer.h"
 #include "input_state.h"
 #include <windows.h>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -89,11 +90,13 @@ int main(int argc, char** argv) {
     try {
         unsigned long frames = 0;
         bool lifecycleTest = false;
+        bool reverseOrder = false;
         if (argc != 1) {
             lifecycleTest = argc == 2 && std::string(argv[1]) == "--lifecycle-test";
-            if (!lifecycleTest) {
+            reverseOrder = argc == 2 && std::string(argv[1]) == "--reverse-order";
+            if (!lifecycleTest && !reverseOrder) {
                 if (argc != 3 || std::string(argv[1]) != "--frames")
-                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test]");
+                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test | --reverse-order]");
                 const std::string value(argv[2]);
                 size_t parsed = 0;
                 frames = std::stoul(value, &parsed);
@@ -132,6 +135,9 @@ int main(int argc, char** argv) {
             state.sizeChanged = false;
             ShowWindow(window, SW_SHOW);
             UpdateWindow(window);
+            auto objects = scene::referenceObjects;
+            if (reverseOrder) std::reverse(objects.begin(), objects.end());
+            log << "Reference draw order: " << (reverseOrder ? "reversed" : "normal") << '\n';
             bool running = true;
             unsigned long presented = 0;
             unsigned testStage = 0;
@@ -218,7 +224,7 @@ int main(int argc, char** argv) {
                       << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
                 SetWindowTextW(window, title.str().c_str());
                 const auto submitStart = FrameTimer::Clock::now();
-                graphics.present();
+                graphics.present(objects, scene::view());
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
                 ++presented;
                 if (frames && presented >= frames) running = false;
@@ -235,5 +241,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+
+
 
 
