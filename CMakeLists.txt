@@ -29,3 +29,7 @@ target_include_directories(starfall_input_timing_tests PRIVATE src)
 target_compile_definitions(starfall_input_timing_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 add_test(NAME starfall_input_timing_tests COMMAND starfall_input_timing_tests)
 
+
+add_executable(starfall_scene_tests tests/scene_tests.cpp)
+target_include_directories(starfall_scene_tests PRIVATE src)
+add_test(NAME starfall_scene_tests COMMAND starfall_scene_tests)
