@@ -1,8 +1,12 @@
 #include "dx11.h"
+#include "frame_timer.h"
+#include "input_state.h"
 #include <windows.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -11,6 +15,10 @@ struct WindowState {
     bool minimized = false;
     bool sizeChanged = true;
     std::ostream* log = nullptr;
+    bool focused = false;
+    bool captured = false;
+    InputState input;
+    FrameTimer timer;
 };
 LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* state = reinterpret_cast<WindowState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -23,9 +31,41 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (message == WM_SIZE) {
             state->minimized = wParam == SIZE_MINIMIZED;
             state->sizeChanged = true;
+            if (state->minimized) {
+                state->timer.reset();
+                state->input.clear();
+                if (state->captured) ReleaseCapture();
+            }
             *state->log << (state->minimized ? "Minimized\n" : "Client size changed\n");
         } else if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {
-            *state->log << (message == WM_SETFOCUS ? "Focus gained\n" : "Focus lost\n");
+            state->focused = message == WM_SETFOCUS;
+            state->timer.reset();
+            if (!state->focused) {
+                state->input.clear();
+                if (state->captured) ReleaseCapture();
+            }
+            *state->log << (state->focused ? "Focus gained\n" : "Focus lost\n");
+        } else if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) {
+            state->input.keyDown(static_cast<std::size_t>(wParam));
+            if (wParam == VK_ESCAPE && state->captured) ReleaseCapture();
+        } else if (message == WM_KEYUP || message == WM_SYSKEYUP) {
+            state->input.keyUp(static_cast<std::size_t>(wParam));
+        } else if (message == WM_RBUTTONDOWN) {
+            SetCapture(window);
+            state->captured = GetCapture() == window;
+            state->input.keyDown(VK_RBUTTON);
+        } else if (message == WM_RBUTTONUP) {
+            state->input.keyUp(VK_RBUTTON);
+        } else if (message == WM_CAPTURECHANGED) {
+            state->captured = false;
+            state->input.keyUp(VK_RBUTTON);
+        } else if (message == WM_INPUT && state->captured && state->focused) {
+            RAWINPUT raw{};
+            UINT size = sizeof(raw);
+            if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, &raw, &size,
+                                sizeof(RAWINPUTHEADER)) == sizeof(raw) &&
+                raw.header.dwType == RIM_TYPEMOUSE && !(raw.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE))
+                state->input.addMouse(raw.data.mouse.lLastX, raw.data.mouse.lLastY);
         } else if (message == WM_DPICHANGED) {
             const auto* suggested = reinterpret_cast<RECT*>(lParam);
             SetWindowPos(window, nullptr, suggested->left, suggested->top,
@@ -75,12 +115,16 @@ int main(int argc, char** argv) {
         RECT rect{0, 0, 1280, 720};
         if (!AdjustWindowRectExForDpi(&rect, style, FALSE, 0, GetDpiForSystem()))
             throw std::runtime_error("AdjustWindowRectExForDpi failed");
-        WindowState state{false, true, &log};
+        WindowState state;
+        state.log = &log;
         HWND window = CreateWindowExW(0, wc.lpszClassName, L"Starfall - DirectX 11", style,
             CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top,
             nullptr, nullptr, instance, &state);
         if (!window) throw std::runtime_error("CreateWindowExW failed: " + std::to_string(GetLastError()));
         try {
+            RAWINPUTDEVICE mouse{0x01, 0x02, 0, window};
+            if (!RegisterRawInputDevices(&mouse, 1, sizeof(mouse)))
+                throw std::runtime_error("RegisterRawInputDevices failed: " + std::to_string(GetLastError()));
             Dx11 graphics(log);
             RECT client{};
             if (!GetClientRect(window, &client)) throw std::runtime_error("GetClientRect failed");
@@ -103,7 +147,10 @@ int main(int argc, char** argv) {
             };
             if (lifecycleTest && !SetTimer(window, 1, 100, nullptr))
                 throw std::runtime_error("SetTimer failed");
+            double submissionMs = 0.0;
             while (running) {
+                const auto updateStart = FrameTimer::Clock::now();
+                state.input.beginFrame();
                 MSG message{};
                 while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
                     if (message.message == WM_QUIT) { running = false; break; }
@@ -133,7 +180,8 @@ int main(int argc, char** argv) {
                     DispatchMessageW(&message);
                 }
                 if (!running) break;
-                if (state.minimized) {
+                if (state.minimized || !state.focused) {
+                    state.timer.reset();
                     if (!WaitMessage()) throw std::runtime_error("WaitMessage failed");
                     continue;
                 }
@@ -148,7 +196,30 @@ int main(int argc, char** argv) {
                     graphics.resize(width, height);
                     state.sizeChanged = false;
                 }
+                const double dt = state.timer.tick(FrameTimer::Clock::now());
+                const auto updateEnd = FrameTimer::Clock::now();
+                const double updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+                auto keys = [&](auto predicate) {
+                    std::wostringstream result;
+                    bool any = false;
+                    for (std::size_t key = 0; key < InputState::keyCount; ++key) {
+                        if (predicate(key)) { if (any) result << L","; result << key; any = true; }
+                    }
+                    return any ? result.str() : std::wstring(L"-");
+                };
+                std::wostringstream title;
+                title << std::fixed << std::setprecision(2)
+                      << L"Starfall | dt " << dt * 1000.0 << L" ms | update " << updateMs
+                      << L" ms | submit/present " << submissionMs << L" ms | held "
+                      << keys([&](auto key) { return state.input.held(key); }) << L" | press "
+                      << keys([&](auto key) { return state.input.pressed(key); }) << L" | release "
+                      << keys([&](auto key) { return state.input.released(key); }) << L" | mouse "
+                      << state.input.mouseX() << L"," << state.input.mouseY()
+                      << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
+                SetWindowTextW(window, title.str().c_str());
+                const auto submitStart = FrameTimer::Clock::now();
                 graphics.present();
+                submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
                 ++presented;
                 if (frames && presented >= frames) running = false;
             }

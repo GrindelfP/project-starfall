@@ -1,7 +1,7 @@
 # 0003 - Frame timing and native input
 
 Name: Frame timing and native input
-Status: ready
+Status: in progress
 Dependencies: 0002-window-resize-and-lifecycle.md.
 
 ## Description
@@ -21,3 +21,8 @@ Separate update work from presentation enough to inspect their CPU durations wit
 ## Boundaries
 
 No controller support, input-remapping UI, simulation framework, FPS claims or GPU performance measurements.
+
+## Implementation and verification
+
+Variable-step timing and reusable input state are implemented; see [timing and input](../timing-input.md). Debug and Release builds and input/timing CTest passed on 2026-11-15. The existing lifecycle test completed in both configurations, including minimize/restore and close while minimized. Interactive focus and capture validation remains pending.
+
