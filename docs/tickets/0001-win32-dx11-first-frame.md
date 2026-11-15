@@ -1,7 +1,7 @@
 # 0001 - Win32 and DirectX 11 first frame
 
 Name: Win32 and DirectX 11 first frame
-Status: ready
+Status: done
 Dependencies: None.
 
 ## Description
@@ -25,3 +25,9 @@ The ticket establishes a minimal vertical slice. Propose any substantive source 
 No triangle, camera, gameplay, DX12 backend, fullscreen mode or benchmarking. Resizing robustness is handled in 0002. Creating this ticket does not start implementation; select it explicitly before coding.
 
 Status vocabulary for this backlog: `ready` means queued, `process` means actively being implemented, and `done` means acceptance criteria have been verified. A queued ticket's dependencies must be completed before it starts.
+
+## Verification (2026-11-15)
+
+Debug and Release preset builds succeeded. A visible Debug window showed the navy clear and closed via Alt+F4 after 602 frames. Debug diagnostics selected NVIDIA GeForce GTX 1050 (10DE:1C8D), feature level 12_1, recorded no messages before the live-object report, and reported only the device held for the report. Bounded Debug and Release runs presented 120 frames each and exited successfully. Invalid frame-count input returned an error. A temporary injected failure after render-target creation exited with an error and the same clean live-object report; the source was restored and Debug rebuilt.
+
+

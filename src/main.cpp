@@ -13,9 +13,11 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
 }
 }
 int main(int argc, char** argv) {
-    std::filesystem::create_directories("out");
-    std::ofstream log("out/dx11-diagnostics.log", std::ios::trunc);
-    if (!log) { std::cerr << "Cannot open out/dx11-diagnostics.log\n"; return 1; }
+    wchar_t executable[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, executable, MAX_PATH);
+    if (!length || length == MAX_PATH) { std::cerr << "Cannot locate executable\n"; return 1; }
+    std::ofstream log(std::filesystem::path(executable).parent_path() / "dx11-diagnostics.log", std::ios::trunc);
+    if (!log) { std::cerr << "Cannot open diagnostics file next to executable\n"; return 1; }
     try {
         unsigned long frames = 0;
         if (argc != 1) {
@@ -72,4 +74,5 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+
 
