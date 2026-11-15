@@ -9,4 +9,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Environment foundation only. Add application targets after user authorization.
+
+
+add_executable(starfall src/main.cpp src/dx11.cpp src/dx11.h)
+target_link_libraries(starfall PRIVATE d3d11 dxgi)
+target_compile_definitions(starfall PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+
+
