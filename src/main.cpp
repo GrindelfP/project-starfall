@@ -345,7 +345,7 @@ int main(int argc, char** argv) {
                 }
                 const auto submitStart = FrameTimer::Clock::now();
                 if (referenceScene) {
-                    graphics.present(objects, camera.view(), depthCheck);
+                    graphics.present(objects, benchmarkPath.empty() ? camera.view() : scene::view(), depthCheck);
                 } else {
                     auto sandboxObjects = ship.objects();
                     sandboxObjects.insert(sandboxObjects.end(), fieldObjects.begin(), fieldObjects.end());

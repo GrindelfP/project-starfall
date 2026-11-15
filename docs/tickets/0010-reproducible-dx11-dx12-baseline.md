@@ -1,7 +1,7 @@
 # 0010 - Reproducible DX11 and DX12 baseline
 
 Name: Reproducible DX11 and DX12 baseline
-Status: ready
+Status: done (PIX capture unavailable; limitation documented)
 Dependencies: 0003-frame-timing-and-input.md, 0009-dx12-first-scene.md.
 
 ## Description
