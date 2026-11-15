@@ -25,6 +25,6 @@ Use the `debug` preset and build directory for Debug. The app and compiled shade
 .\out\build\debug\starfall.exe --backend dx11 --depth-check
 ```
 
-DX11 and the sandbox are defaults. `--seed <uint32>` selects a deterministic asteroid field; `--scene reference` displays the shared reference scene. The bounded demo uses fixed simulation steps; it is a smoke run, not by itself a performance measurement. Diagnostics are overwritten beside the executable on each run. [DX12 details](docs/dx12.md) describe capture and synchronization. See the benchmark documentation for reproducible performance measurements and their limitations.
+DX11 and the sandbox are defaults. `--seed <uint32>` selects a deterministic asteroid field; `--scene reference` displays the shared reference scene. The bounded demo uses fixed simulation steps; it is a smoke run, not by itself a performance measurement. Diagnostics are overwritten beside the executable on each run. [DX12 details](docs/dx12.md) describe capture and synchronization. See the [benchmark report](docs/benchmark-0010.md) for reproducible performance measurements and their limitations.
 
 [Architecture](docs/architecture.md) · [Development environment](docs/development-environment.md) · [Tickets](docs/tickets) · [Session log](docs/session-log.md) · [Historical first-frame validation](docs/first-frame-validation.md)
