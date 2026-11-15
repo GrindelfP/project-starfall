@@ -1,0 +1,14 @@
+/out/
+/build/
+/CMakeUserPresets.json
+/.vs/
+*.user
+*.suo
+*.obj
+*.pdb
+*.exe
+*.dll
+*.cso
+*.dxil
+*.etl
+*.wpix

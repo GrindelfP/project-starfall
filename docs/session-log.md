@@ -1,0 +1,9 @@
+# Session log
+
+2026-11-15 - 21:52 MSK - Resumed after user-controlled restart using grindelf-begin. Verified Graphics Tools Installed, DX11 debug device and DX12 debug layer/GPU-validation interface HRESULT 0x0. C++20/device/shader checks and CTest 1/1 passed again. GTX 1050 driver remains 582.28. Fetched the still-empty remote; no pull possible on unborn main. Updating the approved foundation for commit review; no commit/push authorized or performed.
+
+2026-11-15 - 21:25 MSK - Inspected Windows/tools/GPU/SSH and the empty workspace; installed Git, configured the user-approved dedicated SSH key and supplied Git identity; verified both SSH repositories; cloned the project and private skills. Linked six skills with approval; user confirmed Codex discovery of grindelf-project-bootstrap. Read and applied it as the explicitly approved replacement for absent grindelf-initialize. Created approved foundation only. No commit or push authorized yet.
+
+2026-11-15 - 21:31 MSK - Verified complete MSVC/SDK/CMake/Ninja installation, both empty project presets and disposable C++20/DX11/DX12/SM5/SM6 shader checks. Initial sandbox PDB failure was resolved by approved execution outside the sandbox. PIX installed and CLI checked. No game implementation.
+
+2026-11-15 - 21:34 MSK - WinDbg console debugger hit a symbolic breakpoint at main and ran the diagnostic. Graphics Tools installation returned RestartNeeded=True; independent query reports InstallPending. Both debug layers still return 0x887A002D. Resume after a user-controlled Windows restart, rerun the external Run-Verification.ps1 and check debug HRESULTs and GPU-validation-interface acquisition. Do not infer debug success from the diagnostic's overall pass. DX12 maximum feature level 12_1, SM6.8, DXR/mesh/sampler-feedback tiers 0. All work remains uncommitted; no push.
