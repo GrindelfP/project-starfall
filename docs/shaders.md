@@ -1,0 +1,3 @@
+# DirectX 11 shaders
+
+The application compiles versioned HLSL at startup with the Windows SDK's D3DCompile (`VSMain`/`vs_5_0` and `PSMain`/`ps_5_0`). There is no additional shader toolchain or persisted bytecode. The build copies `shaders/triangle.hlsl` beside the executable under `shaders/`; runtime locates it relative to the executable, independently of the working directory. After editing HLSL, run `cmake --build --preset debug` or `cmake --build --preset release` and restart that configuration. Compilation failures include the shader path, entry point, target and compiler diagnostics in `dx11-diagnostics.log` beside the executable.
