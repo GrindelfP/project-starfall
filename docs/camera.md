@@ -9,4 +9,4 @@ The initial and reset pose is the origin, looking along +Z with +Y up, matching 
 
 Movement uses elapsed frame time and normalizes combined directions. Mouse movement is relative and is cleared on capture transitions to avoid applying stale deltas.
 
-Automated camera basis, clamp, movement, frame-rate and reset checks are in `tests/camera_tests.cpp`. Interactive navigation, focus and capture validation remain pending; no manual result is claimed.
+Automated camera basis, clamp, movement, frame-rate and reset checks are in `tests/camera_tests.cpp`. Debug and Release builds succeeded, and CTest passed all three tests in each configuration, including the camera tests. Interactive navigation, focus and capture validation remain pending; no manual result is claimed.
