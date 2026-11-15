@@ -1,7 +1,7 @@
 # 0008 - Asteroid flight sandbox
 
 Name: Asteroid flight sandbox
-Status: ready
+Status: process
 Dependencies: 0007-player-ship-and-chase-camera.md.
 
 ## Description
