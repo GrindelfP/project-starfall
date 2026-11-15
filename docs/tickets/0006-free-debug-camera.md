@@ -1,7 +1,7 @@
 # 0006 - Free-flying debug camera
 
 Name: Free-flying debug camera
-Status: ready
+Status: implementation complete; manual navigation validation pending
 Dependencies: 0005-indexed-3d-scene-and-depth.md.
 
 ## Description
@@ -21,3 +21,7 @@ Use the timing/input behavior from 0003 and the coordinate conventions from 0005
 ## Boundaries
 
 No camera collision, third-party UI dependency, editor, orbit camera or third-person ship controls; those begin in 0007.
+
+## Implementation evidence
+
+Controls and automated coverage are documented in `docs/camera.md`. Interactive navigation, capture and focus behavior remain to be manually validated.

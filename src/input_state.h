@@ -17,6 +17,7 @@ public:
         for (std::size_t i = 0; i < keyCount; ++i) if (held_[i]) keyUp(i);
         mouseX_ = mouseY_ = 0;
     }
+    void discardMouse() { mouseX_ = mouseY_ = 0; }
     void addMouse(long x, long y) { mouseX_ += x; mouseY_ += y; }
     bool held(std::size_t key) const { return key < keyCount && held_[key]; }
     bool pressed(std::size_t key) const { return key < keyCount && pressed_[key]; }

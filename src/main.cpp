@@ -1,4 +1,5 @@
 #include "dx11.h"
+#include "camera.h"
 #include "frame_timer.h"
 #include "input_state.h"
 #include <windows.h>
@@ -52,6 +53,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         } else if (message == WM_KEYUP || message == WM_SYSKEYUP) {
             state->input.keyUp(static_cast<std::size_t>(wParam));
         } else if (message == WM_RBUTTONDOWN) {
+            state->input.discardMouse();
             SetCapture(window);
             state->captured = GetCapture() == window;
             state->input.keyDown(VK_RBUTTON);
@@ -60,6 +62,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         } else if (message == WM_CAPTURECHANGED) {
             state->captured = false;
             state->input.keyUp(VK_RBUTTON);
+            state->input.discardMouse();
         } else if (message == WM_INPUT && state->captured && state->focused) {
             RAWINPUT raw{};
             UINT size = sizeof(raw);
@@ -138,6 +141,7 @@ int main(int argc, char** argv) {
             state.sizeChanged = false;
             ShowWindow(window, SW_SHOW);
             UpdateWindow(window);
+            Camera camera;
             auto objects = scene::referenceObjects;
             if (reverseOrder) std::reverse(objects.begin(), objects.end());
             log << "Reference draw order: " << (reverseOrder ? "reversed" : "normal") << '\n';
@@ -206,6 +210,15 @@ int main(int argc, char** argv) {
                     state.sizeChanged = false;
                 }
                 const double dt = state.timer.tick(FrameTimer::Clock::now());
+                if (state.input.pressed('R')) {
+                    camera.reset();
+                } else {
+                    if (state.captured) camera.look(static_cast<float>(state.input.mouseX()), static_cast<float>(state.input.mouseY()));
+                    camera.move(static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
+                        static_cast<float>(state.input.held('E')) - static_cast<float>(state.input.held('Q')),
+                        static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
+                        static_cast<float>(dt), state.input.held(VK_SHIFT));
+                }
                 const auto updateEnd = FrameTimer::Clock::now();
                 const double updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
                 auto keys = [&](auto predicate) {
@@ -227,7 +240,7 @@ int main(int argc, char** argv) {
                       << (state.captured ? L" | captured (Esc releases)" : L" | right-click to capture");
                 SetWindowTextW(window, title.str().c_str());
                 const auto submitStart = FrameTimer::Clock::now();
-                graphics.present(objects, scene::view(), depthCheck);
+                graphics.present(objects, camera.view(), depthCheck);
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
                 ++presented;
                 if (frames && presented >= frames) running = false;
