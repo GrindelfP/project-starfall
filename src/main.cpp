@@ -48,14 +48,18 @@ int main(int argc, char** argv) {
     if (!log) { std::cerr << "Cannot open diagnostics file next to executable\n"; return 1; }
     try {
         unsigned long frames = 0;
+        bool lifecycleTest = false;
         if (argc != 1) {
-            if (argc != 3 || std::string(argv[1]) != "--frames")
-                throw std::runtime_error("Usage: starfall [--frames positive-count]");
-            const std::string value(argv[2]);
-            size_t parsed = 0;
-            frames = std::stoul(value, &parsed);
-            if (parsed != value.size() || frames == 0 || value[0] == '-')
-                throw std::runtime_error("Frame count must be a positive integer");
+            lifecycleTest = argc == 2 && std::string(argv[1]) == "--lifecycle-test";
+            if (!lifecycleTest) {
+                if (argc != 3 || std::string(argv[1]) != "--frames")
+                    throw std::runtime_error("Usage: starfall [--frames positive-count | --lifecycle-test]");
+                const std::string value(argv[2]);
+                size_t parsed = 0;
+                frames = std::stoul(value, &parsed);
+                if (parsed != value.size() || frames == 0 || value[0] == '-')
+                    throw std::runtime_error("Frame count must be a positive integer");
+            }
         }
         if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
             throw std::runtime_error("SetProcessDpiAwarenessContext failed: " + std::to_string(GetLastError()));
@@ -86,10 +90,45 @@ int main(int argc, char** argv) {
             UpdateWindow(window);
             bool running = true;
             unsigned long presented = 0;
+            unsigned testStage = 0;
+            ULONGLONG cpuStart = 0;
+            auto cpuTime = []() {
+                FILETIME created{}, exited{}, kernel{}, user{};
+                if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user))
+                    throw std::runtime_error("GetProcessTimes failed");
+                ULARGE_INTEGER k{}, u{};
+                k.LowPart = kernel.dwLowDateTime; k.HighPart = kernel.dwHighDateTime;
+                u.LowPart = user.dwLowDateTime; u.HighPart = user.dwHighDateTime;
+                return k.QuadPart + u.QuadPart;
+            };
+            if (lifecycleTest && !SetTimer(window, 1, 100, nullptr))
+                throw std::runtime_error("SetTimer failed");
             while (running) {
                 MSG message{};
                 while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
                     if (message.message == WM_QUIT) { running = false; break; }
+                    if (lifecycleTest && message.message == WM_TIMER && message.wParam == 1) {
+                        if (testStage < 4) {
+                            SetWindowPos(window, nullptr, 0, 0, 800 + 100 * testStage,
+                                600 + 50 * testStage, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+                        } else if (testStage == 4) {
+                            ShowWindow(window, SW_MINIMIZE);
+                            cpuStart = cpuTime();
+                            if (!SetTimer(window, 1, 500, nullptr)) throw std::runtime_error("SetTimer failed");
+                        } else if (testStage == 5) {
+                            log << "Minimized process CPU over 500 ms: " << (cpuTime() - cpuStart) / 10000.0 << " ms\n";
+                            ShowWindow(window, SW_RESTORE);
+                            if (!SetTimer(window, 1, 100, nullptr)) throw std::runtime_error("SetTimer failed");
+                        } else if (testStage == 6) {
+                            ShowWindow(window, SW_MINIMIZE);
+                        } else {
+                            KillTimer(window, 1);
+                            PostMessageW(window, WM_CLOSE, 0, 0);
+                            log << "Lifecycle test: requested close while minimized\n";
+                        }
+                        ++testStage;
+                        continue;
+                    }
                     TranslateMessage(&message);
                     DispatchMessageW(&message);
                 }

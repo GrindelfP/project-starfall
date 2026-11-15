@@ -1,7 +1,7 @@
 # 0002 - Window resize and graphics lifecycle
 
 Name: Window resize and graphics lifecycle
-Status: ready
+Status: done
 Dependencies: 0001-win32-dx11-first-frame.md.
 
 ## Description
