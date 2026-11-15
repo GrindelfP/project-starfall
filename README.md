@@ -1,37 +1,30 @@
 # Project Starfall
 
-A native Windows C++20 space game and graphics research laboratory using DirectX 11 and DirectX 12.
+A native Windows C++20 space-flight sandbox and graphics research project with DirectX 11 and DirectX 12 renderers. Fly among a reproducible field of placeholder asteroids; contact resets the ship. This is an early prototype.
 
-The first milestone opens a resizable native Win32 window and draws an asymmetric, interpolated-color triangle on a dark blue background using an explicitly selected NVIDIA hardware adapter.
+Double-click **Play-Starfall.cmd** to launch the Release sandbox. If it has not been built, the launcher prints the build commands. The launcher does not build or update files. Close the game with the window close button or Alt+F4.
 
-From the repository root, open Windows PowerShell and build both configurations:
+In chase view, use W/S for thrust, A/D for yaw, Up/Down for pitch, Space/Ctrl for vertical movement and Shift for boost. C toggles the free camera, and R restores the ship, camera and seeded field. In free view, W/A/S/D and Q/E move; right-click captures the mouse for looking and Escape releases it. See [flight controls](docs/flight.md) and [camera controls](docs/camera.md).
+
+From the repository root, build with Windows PowerShell, MSVC x64, CMake and Ninja:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -NoExit
 . .\scripts\Enter-DevEnvironment.ps1
-cmake --preset debug
-cmake --build --preset debug
 cmake --preset release
 cmake --build --preset release
+ctest --test-dir out/build/release --output-on-failure
 ```
 
-Run from any working directory using the executable path. From the repository root:
+Use the `debug` preset and build directory for Debug. The app and compiled shaders live in ignored `out/build/<configuration>/`. Examples:
 
 ```powershell
-.\out\build\debug\starfall.exe
-.\out\build\release\starfall.exe
-# Optional bounded smoke run:
-.\out\build\debug\starfall.exe --frames 120
+.\out\build\release\starfall.exe --backend dx11 --scene sandbox
+.\out\build\release\starfall.exe --backend dx12 --scene sandbox
+.\out\build\release\starfall.exe --backend dx12 --scene sandbox --demo --frames 120
+.\out\build\debug\starfall.exe --backend dx11 --depth-check
 ```
 
-For the manual smoke test, run Debug, confirm the visible colored triangle, and close it with the window close button or Alt+F4. Each run overwrites `dx11-diagnostics.log` beside its executable under `out/build/<configuration>/`. Check the adapter, feature level, frame count, clean shutdown and Debug messages. In the live-object report, the device itself is expected while the diagnostic interfaces are still querying it; render targets, swap chain and context should have been released. Shader compilation and rebuild instructions are in [shaders](docs/shaders.md).
+DX11 and the sandbox are defaults. `--seed <uint32>` selects a deterministic asteroid field; `--scene reference` displays the shared reference scene. The bounded demo uses fixed simulation steps; it is a smoke run, not by itself a performance measurement. Diagnostics are overwritten beside the executable on each run. [DX12 details](docs/dx12.md) describe capture and synchronization. See the benchmark documentation for reproducible performance measurements and their limitations.
 
-For a lifecycle check, run each configuration and repeatedly drag the window edges, maximize and restore it, minimize it for several seconds, then restore it and confirm the clear is visible. Close normally, and repeat with the window minimized (for example, from its taskbar menu). Inspect the diagnostics for each client/viewport size, clean shutdown, and, in Debug, errors and unexpected live graphics objects. The process waits for messages while minimized instead of rendering. The process uses per-monitor-v2 DPI awareness, accepts Windows' suggested rectangle when the monitor DPI changes, and obtains actual client pixels for the swap chain and viewport; the initial 1280 x 720 client request is adjusted at the system DPI and may differ on another monitor.
-
-The optional `starfall.exe --lifecycle-test` changes the window size four times, minimizes for 500 ms while measuring process CPU time, restores, and requests close while minimized. It records the result in the same diagnostics file.
-
-Lifecycle verification on 2026-11-15: Debug and Release built and were manually observed maximizing (client 1920 x 991), restoring (1280 x 720), minimizing, restoring the clear, and closing normally. The internal test exercised four further client sizes (782 x 553 through 1082 x 703), restore, and close while minimized in both configurations; process CPU time was 15.625 ms over the 500 ms minimized interval in each run. Debug reported no messages before its live-object report, which listed only the expected device. Interactive edge dragging and movement between monitors with different DPI have not been manually verified.
-
-Verified on 2026-11-15: Debug and Release builds succeeded; both selected NVIDIA GeForce GTX 1050 (vendor `10DE`, device `1C8D`), feature level `12_1`. A visible Debug window presented 602 frames and closed using Alt+F4; the debug layer reported no messages before its live-object check and only the device during the check. Bounded Debug and Release runs each presented 120 frames and exited successfully. This is a functional smoke test, not a performance measurement.
-
-See [development environment](docs/development-environment.md), [architecture context](docs/architecture.md), [workflow rules](RULES.md), and [session log](docs/session-log.md).
+[Architecture](docs/architecture.md) · [Development environment](docs/development-environment.md) · [Tickets](docs/tickets) · [Session log](docs/session-log.md) · [Historical first-frame validation](docs/first-frame-validation.md)

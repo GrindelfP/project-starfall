@@ -1,17 +1,11 @@
-# Approved project context
+# Project architecture
 
-Starfall has two equal goals: a small playable third-person space shooter and a graphics laboratory for comparing native DirectX 11 and DirectX 12 on the same hardware.
+Starfall combines an early third-person space-flight sandbox with a native DirectX 11/DirectX 12 graphics laboratory. The shared CPU simulation and procedural scene feed both renderers; no general-purpose engine or portability framework is used.
 
-The user authorized implementation of the starter tickets on 2026-11-15, including structure and gameplay choices, parallel Terra agents, and at least two local commits per ticket. This session authorization does not authorize a push or change the standing approval rules for future work.
+`src/main.cpp` owns the Win32 window, input, timing, camera selection and application loop. `camera.h`, `ship.h` and `asteroid_field.h` hold renderer-independent state. `scene.h` defines shared indexed cube geometry, object transforms and the left-handed view/projection conventions. The sandbox renders a ship, 64 seeded asteroids and simple landmarks; sphere contact resets the ship. The reference scene is retained for comparisons. See [scene](scene.md), [flight](flight.md), [camera](camera.md), and [timing and input](timing-input.md).
 
-The implementation uses a small native application in `src/main.cpp`, native API resource ownership in backend files, and renderer-independent CPU data in `src/scene.h`. Objects contain transforms and colors; indexed geometry, view matrices and projection conventions can be consumed by either backend. There is no scene graph or general-purpose engine framework. See [scene conventions](scene.md) and [timing/input](timing-input.md).
+`render_backend.h` selects native DX11 or DX12 implementations. Each backend owns its API resources and consumes the same scene objects and camera. DX11 uses its SM5 shader; DX12 compiles SM6 shaders with the Windows SDK `dxc`, uses explicit resource transitions and waits on a fence before reusing its allocator. The current DX12 path favors correctness over throughput; see [DX12](dx12.md). Depth, resize and shutdown are handled per backend. Debug graphics validation and captures are correctness tools, not performance measurements.
 
-The next areas in this implementation run are a free camera, arcade ship flight with a chase camera, a seeded asteroid field with ship reset on contact, a separate native DX12 resource path, and reproducible timing measurements. Shared simulation contains no graphics-resource objects. Native API synchronization remains explicit in each backend.
+Target platform: Windows 11 x64, MSVC C++20, CMake/Ninja, GTX 1050 with 2 GiB physical VRAM. The approximately 60 FPS at 1080p goal requires measured evidence; physical capacity, operating-system budget and owned allocations are distinct. The GPU does not have hardware ray tracing or Tensor cores and does not support mesh shaders. Environment and capability evidence is in [development environment](development-environment.md).
 
-Study topics include buffers, HLSL shaders, constants, textures/samplers, depth/stencil, lighting/shadows, instancing, offscreen rendering/post-processing, compute, synchronization, timestamps, resource management and memory pressure.
-
-Target platform: Windows 11 x64, MSVC C++20, CMake/Ninja, native Win32. No cross-platform abstraction layer or general-purpose engine is required. Initial performance goal: approximately 60 FPS at 1080p, subject to measurement.
-
-Target GPU: NVIDIA GTX 1050 (Pascal), 2 GiB VRAM. Budget resources carefully. Hardware RT cores and Tensor cores are absent; do not plan features requiring them or mesh shaders. Runtime optional capability query results are recorded in the environment document.
-
-The first Win32/DX11 frame, window lifecycle, timing/input, shader pipeline and indexed 3D scene are implemented. Ticket files record their acceptance evidence and any remaining manual-check limitations. Environment-only verification described in the original bootstrap remains historical evidence, not a substitute for application validation.
+Ticket acceptance and remaining interactive validation are tracked in [tickets](tickets). Historical bootstrap verification is not a substitute for application validation. Future research may explore textures, lighting, instancing, post-processing, compute, synchronization and memory pressure, guided by measurements rather than an assumed API advantage.
