@@ -1,7 +1,7 @@
 # 0003 - Frame timing and native input
 
 Name: Frame timing and native input
-Status: in progress
+Status: done
 Dependencies: 0002-window-resize-and-lifecycle.md.
 
 ## Description
@@ -24,5 +24,6 @@ No controller support, input-remapping UI, simulation framework, FPS claims or G
 
 ## Implementation and verification
 
-Variable-step timing and reusable input state are implemented; see [timing and input](../timing-input.md). Debug and Release builds and input/timing CTest passed on 2026-11-15. The existing lifecycle test completed in both configurations, including minimize/restore and close while minimized. Interactive focus and capture validation remains pending.
+Variable-step timing and reusable input state are implemented; see [timing and input](../timing-input.md). Debug and Release builds and input/timing CTest passed on 2026-11-15. The existing lifecycle test completed in both configurations, including minimize/restore and close while minimized. A visible Debug check confirmed right-click capture, Escape release, W press/release without a stuck held state, and focus loss/recovery with resumed delta below 100 ms. The renderer remained visible and diagnostics recorded clean shutdown after 3392 frames. Holding W continuously through Alt-Tab was not manually exercised; focus clearing is covered by the input-state test.
+
 
