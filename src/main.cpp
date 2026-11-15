@@ -1,6 +1,9 @@
 #include "render_backend.h"
 #include "camera.h"
 #include "ship.h"
+#include "asteroid_field.h"
+#include "hud.h"
+#include <memory>
 #include "frame_timer.h"
 #include "input_state.h"
 #include <windows.h>
@@ -97,6 +100,8 @@ int main(int argc, char** argv) {
         bool reverseOrder = false;
         bool depthCheck = false;
         bool useDx12 = false, clearOnly = false, referenceScene = false, demo = false;
+        std::filesystem::path capturePath;
+        std::uint32_t seed = AsteroidField::defaultSeed;
         for (int i = 1; i < argc; ++i) {
             const std::string arg(argv[i]);
             if (arg == "--backend" && i + 1 < argc) {
@@ -107,6 +112,13 @@ int main(int argc, char** argv) {
                 const std::string value(argv[++i]);
                 if (value != "reference" && value != "sandbox") throw std::runtime_error("Scene must be reference or sandbox");
                 referenceScene = value == "reference";
+            } else if (arg == "--capture" && i + 1 < argc) capturePath = argv[++i];
+            else if (arg == "--seed" && i + 1 < argc) {
+                const std::string value(argv[++i]); size_t parsed = 0;
+                const auto number = std::stoull(value, &parsed, 10);
+                if (value.empty() || value[0] == '-' || parsed != value.size() || number > UINT32_MAX)
+                    throw std::runtime_error("Seed must be a decimal integer from 0 to 4294967295");
+                seed = static_cast<std::uint32_t>(number);
             } else if (arg == "--demo") demo = true;
             else if (arg == "--clear-only") clearOnly = true;
             else if (arg == "--lifecycle-test") lifecycleTest = true;
@@ -116,7 +128,7 @@ int main(int argc, char** argv) {
                 const std::string value(argv[++i]); size_t parsed = 0;
                 frames = std::stoul(value, &parsed);
                 if (parsed != value.size() || frames == 0 || value[0] == '-') throw std::runtime_error("Frame count must be a positive integer");
-            } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference|sandbox] [--demo] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
+            } else throw std::runtime_error("Usage: starfall [--backend dx11|dx12] [--scene reference|sandbox] [--demo] [--seed uint32] [--capture path] [--clear-only] [--frames count] [--lifecycle-test] [--reverse-order] [--depth-check]");
         }
         if (depthCheck) referenceScene = true;
         if (demo && referenceScene) throw std::runtime_error("--demo requires sandbox scene");
@@ -139,7 +151,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("AdjustWindowRectExForDpi failed");
         WindowState state;
         state.log = &log;
-        HWND window = CreateWindowExW(0, wc.lpszClassName, L"Starfall - DirectX 11", style,
+        HWND window = CreateWindowExW(0, wc.lpszClassName, L"Starfall", style,
             CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top,
             nullptr, nullptr, instance, &state);
         if (!window) throw std::runtime_error("CreateWindowExW failed: " + std::to_string(GetLastError()));
@@ -151,11 +163,19 @@ int main(int argc, char** argv) {
             RECT client{};
             if (!GetClientRect(window, &client)) throw std::runtime_error("GetClientRect failed");
             graphics.initialize(window, client.right - client.left, client.bottom - client.top);
+            if (!capturePath.empty()) graphics.captureNext(capturePath);
             state.sizeChanged = false;
             ShowWindow(window, SW_SHOW);
             UpdateWindow(window);
             Camera camera;
             Ship ship;
+            AsteroidField field(seed);
+            auto fieldObjects = field.objects();
+            unsigned long contacts = 0;
+            std::unique_ptr<Hud> hud;
+            if (!referenceScene) hud = std::make_unique<Hud>(window);
+            double hudElapsed = 1.0;
+            log << "Asteroid seed: " << seed << "; rocks: " << field.count << '\n';
             bool chase = !referenceScene;
             auto objects = scene::referenceObjects;
             if (reverseOrder) std::reverse(objects.begin(), objects.end());
@@ -232,6 +252,9 @@ int main(int argc, char** argv) {
                 if (state.input.pressed('R')) {
                     camera.reset();
                     ship.reset();
+                    field.reset(seed);
+                    fieldObjects = field.objects();
+                    contacts = 0;
                 } else if (chase) {
                     const float step = demo ? 1.0f / 60.0f : static_cast<float>(dt);
                     ship.update(demo ? 1.0f : static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
@@ -239,12 +262,28 @@ int main(int argc, char** argv) {
                         demo ? 0.12f : static_cast<float>(state.input.held(VK_UP)) - static_cast<float>(state.input.held(VK_DOWN)),
                         demo ? 0.0f : static_cast<float>(state.input.held(VK_SPACE)) - static_cast<float>(state.input.held(VK_CONTROL)),
                         !demo && state.input.held(VK_SHIFT), step);
+                    if (field.contact(ship.position())) {
+                        ++contacts;
+                        ship.reset();
+                        log << "Asteroid contact " << contacts << "; ship reset\n";
+                    }
                 } else {
                     if (state.captured) camera.look(static_cast<float>(state.input.mouseX()), static_cast<float>(state.input.mouseY()));
                     camera.move(static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
                         static_cast<float>(state.input.held('E')) - static_cast<float>(state.input.held('Q')),
                         static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
                         static_cast<float>(dt), state.input.held(VK_SHIFT));
+                }
+                hudElapsed += dt;
+                if (hud && hudElapsed >= 0.25) {
+                    std::wostringstream overlay;
+                    overlay << L"STARFALL / FLIGHT SANDBOX\n"
+                        << L"W/S thrust   A/D yaw   Up/Down pitch   Space/Ctrl rise/drop\n"
+                        << L"Shift boost   C camera   R reset   Esc release mouse\n"
+                        << L"Free camera: right-click + mouse, WASD + Q/E\n"
+                        << (chase ? L"CHASE" : L"FREE") << L"   Seed " << seed << L"   Contacts " << contacts;
+                    hud->setText(overlay.str());
+                    hudElapsed = 0;
                 }
                 const auto updateEnd = FrameTimer::Clock::now();
                 const double updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
@@ -259,7 +298,7 @@ int main(int argc, char** argv) {
                 std::wostringstream title;
                 title << (referenceScene ? L"Reference" : (chase ? L"Flight (C: free, R: reset)" : L"Free (C: chase, R: reset)")) << L" | "
                       << std::fixed << std::setprecision(2)
-                      << L"Starfall | dt " << dt * 1000.0 << L" ms | update " << updateMs
+                      << L"Starfall | seed " << seed << L" | contacts " << contacts << L" | dt " << dt * 1000.0 << L" ms | update " << updateMs
                       << L" ms | submit/present " << submissionMs << L" ms | held "
                       << keys([&](auto key) { return state.input.held(key); }) << L" | press "
                       << keys([&](auto key) { return state.input.pressed(key); }) << L" | release "
@@ -272,7 +311,7 @@ int main(int argc, char** argv) {
                     graphics.present(objects, camera.view(), depthCheck);
                 } else {
                     auto sandboxObjects = ship.objects();
-                    sandboxObjects.insert(sandboxObjects.end(), objects.begin(), objects.end());
+                    sandboxObjects.insert(sandboxObjects.end(), fieldObjects.begin(), fieldObjects.end());
                     graphics.present(sandboxObjects, chase ? ship.chaseView() : camera.view(), depthCheck);
                 }
                 submissionMs = std::chrono::duration<double, std::milli>(FrameTimer::Clock::now() - submitStart).count();
@@ -291,4 +330,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
+
+
 
