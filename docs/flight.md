@@ -7,3 +7,5 @@ The ship moves at 6 world units per second (12 with boost), with a yaw/pitch rat
 `--scene reference` retains the original reference cubes and free camera for renderer comparisons. `--scene sandbox --demo --frames 120` runs a repeatable scripted turn using fixed 1/60-second simulation steps for bounded smoke runs; normal flight uses the clamped frame timer. `--backend dx11|dx12` selects the renderer.
 
 Automated ship tests cover elapsed movement, normalized diagonal movement, turn rates, part orientation, chase target, and reset. Interactive controls and visual readability require manual validation on a desktop.
+
+Debug and Release configured and built; CTest passed 4/4 in each. Bounded sandbox demo smoke runs presented 30 frames and exited successfully in both configurations on both DX11 and DX12. These runs do not establish visual quality or interactive input behavior.
