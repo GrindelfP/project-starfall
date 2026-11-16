@@ -16,8 +16,8 @@ public:
         if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
             throw std::runtime_error("Cannot register the Starfall help panel");
         createFonts();
-        window_ = CreateWindowExW(WS_EX_NOACTIVATE, wc.lpszClassName, L"Starfall controls",
-            WS_CHILD | WS_VISIBLE, px(18), px(18), px(500), px(146), parent, nullptr, wc.hInstance, this);
+        window_ = CreateWindowExW(WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, wc.lpszClassName, L"Starfall controls",
+            WS_POPUP, 0, 0, px(500), px(146), parent, nullptr, wc.hInstance, this);
         if (!window_) {
             DeleteObject(titleFont_); DeleteObject(bodyFont_);
             throw std::runtime_error("Cannot create the Starfall help panel");
@@ -30,6 +30,11 @@ public:
         DeleteObject(titleFont_); DeleteObject(bodyFont_);
     }
     void setText(const std::wstring& text) {
+        text_ = text;
+        InvalidateRect(window_, nullptr, FALSE);
+    }
+    // Owned popup composition keeps the HUD separate from the parent's DXGI surface.
+    void updateLayout() {
         const UINT currentDpi = GetDpiForWindow(parent_);
         const bool dpiChanged = currentDpi && currentDpi != dpi_;
         if (dpiChanged) {
@@ -37,15 +42,18 @@ public:
             DeleteObject(titleFont_); DeleteObject(bodyFont_);
             createFonts();
         }
-        text_ = text;
         RECT client{};
         GetClientRect(parent_, &client);
         const int x = (std::min)(px(18), static_cast<int>(client.right));
         const int y = (std::min)(px(18), static_cast<int>(client.bottom));
         const int width = (std::max)(0, (std::min)(px(500), static_cast<int>(client.right) - x));
         const int height = (std::max)(0, (std::min)(px(146), static_cast<int>(client.bottom) - y));
-        SetWindowPos(window_, HWND_TOP, x, y, width, height, SWP_NOACTIVATE);
-        InvalidateRect(window_, nullptr, FALSE);
+        POINT origin{x, y};
+        ClientToScreen(parent_, &origin);
+        const bool visible = IsWindowVisible(parent_) && !IsIconic(parent_) && width > 0 && height > 0;
+        SetWindowPos(window_, nullptr, origin.x, origin.y, width, height,
+            SWP_NOACTIVATE | SWP_NOZORDER | (visible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+        if (dpiChanged) InvalidateRect(window_, nullptr, FALSE);
     }
 private:
     int px(int value) const { return MulDiv(value, static_cast<int>(dpi_), 96); }
