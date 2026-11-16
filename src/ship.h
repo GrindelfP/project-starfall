@@ -4,13 +4,13 @@
 #include <cmath>
 #include <vector>
 
-// Responsive, inertialess flight in the shared left-handed world.
+// World-space velocity persists without thrust; steering changes thrust direction only.
 class Ship {
 public:
-    static constexpr float speed = 6.0f, boost = 2.0f, turnRate = 1.4f;
+    static constexpr float acceleration = 3.0f, boost = 2.0f, maxSpeed = 12.0f, turnRate = 1.4f;
     static constexpr float mouseSensitivity = 0.0025f; // radians per raw mouse count
     static constexpr float pitchLimit = DirectX::XM_PIDIV2 - 0.05f;
-    void reset() { position_ = {0, 0, 0}; yaw_ = pitch_ = 0; }
+    void reset() { position_ = {0, 0, 0}; velocity_ = {0, 0, 0}; yaw_ = pitch_ = 0; }
     DirectX::XMVECTOR forward() const {
         return DirectX::XMVectorSet(std::sin(yaw_)*std::cos(pitch_), std::sin(pitch_),
             std::cos(yaw_)*std::cos(pitch_), 0);
@@ -27,8 +27,14 @@ public:
         XMVECTOR delta = XMVectorAdd(XMVectorScale(forward(), thrust), XMVectorSet(0, vertical, 0, 0));
         const float length = XMVectorGetX(XMVector3Length(delta));
         if (length > 1) delta = XMVectorScale(delta, 1 / length);
+        const XMVECTOR oldVelocity = XMLoadFloat3(&velocity_);
+        XMVECTOR newVelocity = XMVectorAdd(oldVelocity,
+            XMVectorScale(delta, acceleration * (fast ? boost : 1.0f) * dt));
+        const float speed = XMVectorGetX(XMVector3Length(newVelocity));
+        if (speed > maxSpeed) newVelocity = XMVectorScale(newVelocity, maxSpeed / speed);
         XMStoreFloat3(&position_, XMVectorAdd(XMLoadFloat3(&position_),
-            XMVectorScale(delta, speed * (fast ? boost : 1.0f) * dt)));
+            XMVectorScale(XMVectorAdd(oldVelocity, newVelocity), 0.5f * dt)));
+        XMStoreFloat3(&velocity_, newVelocity);
     }
     DirectX::XMMATRIX chaseView() const {
         using namespace DirectX;
@@ -57,9 +63,11 @@ public:
         return result;
     }
     DirectX::XMFLOAT3 position() const { return position_; }
+    DirectX::XMFLOAT3 velocity() const { return velocity_; }
     float yaw() const { return yaw_; }
     float pitch() const { return pitch_; }
 private:
     DirectX::XMFLOAT3 position_{0,0,0};
+    DirectX::XMFLOAT3 velocity_{0,0,0};
     float yaw_ = 0, pitch_ = 0;
 };

@@ -8,10 +8,25 @@ int main() {
     Ship a, b;
     for (int i=0; i<30; ++i) a.update(1,0,0,0,false,1.0f/30);
     for (int i=0; i<144; ++i) b.update(1,0,0,0,false,1.0f/144);
-    if (!close(a.position().z, Ship::speed) || !close(a.position().z,b.position().z)) return fail("fixed interval movement");
+    if (!close(a.velocity().z, Ship::acceleration) || !close(a.position().z, Ship::acceleration/2) ||
+        !close(a.position().z,b.position().z)) return fail("fixed interval acceleration");
+    a.update(0,0,0,0,false,1);
+    if (!close(a.velocity().z, Ship::acceleration) || !close(a.position().z, Ship::acceleration*1.5f)) return fail("coasting");
+    a.look(XM_PIDIV2 / Ship::mouseSensitivity, 0);
+    a.update(0,0,0,0,false,1);
+    if (!close(a.velocity().x,0) || !close(a.velocity().z,Ship::acceleration)) return fail("turn preserves velocity");
+    a.look(-XM_PIDIV2 / Ship::mouseSensitivity, 0);
+    a.update(-1,0,0,0,false,1);
+    if (!close(a.velocity().z,0)) return fail("reverse thrust brakes");
     Ship diagonal; diagonal.update(1,0,0,1,false,1);
-    auto p = diagonal.position();
-    if (!close(std::sqrt(p.y*p.y+p.z*p.z), Ship::speed)) return fail("normalized movement");
+    auto v = diagonal.velocity();
+    if (!close(std::sqrt(v.y*v.y+v.z*v.z), Ship::acceleration)) return fail("normalized thrust");
+    Ship boosted; boosted.update(1,0,0,0,true,1);
+    if (!close(boosted.velocity().z, Ship::acceleration * Ship::boost)) return fail("boost acceleration");
+    boosted.update(1,0,0,0,true,10);
+    if (!close(boosted.velocity().z, Ship::maxSpeed)) return fail("speed cap");
+    boosted.reset(); boosted.update(0,0,0,0,false,1);
+    if (!close(boosted.position().z,0) || !close(boosted.velocity().z,0)) return fail("reset clears velocity");
     Ship mouse; mouse.look(100, -200);
     if (!close(mouse.yaw(), 100 * Ship::mouseSensitivity) ||
         !close(mouse.pitch(), 200 * Ship::mouseSensitivity)) return fail("mouse direction and sensitivity");
