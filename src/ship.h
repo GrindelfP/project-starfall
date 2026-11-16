@@ -8,11 +8,16 @@
 class Ship {
 public:
     static constexpr float speed = 6.0f, boost = 2.0f, turnRate = 1.4f;
+    static constexpr float mouseSensitivity = 0.0025f; // radians per raw mouse count
     static constexpr float pitchLimit = DirectX::XM_PIDIV2 - 0.05f;
     void reset() { position_ = {0, 0, 0}; yaw_ = pitch_ = 0; }
     DirectX::XMVECTOR forward() const {
         return DirectX::XMVectorSet(std::sin(yaw_)*std::cos(pitch_), std::sin(pitch_),
             std::cos(yaw_)*std::cos(pitch_), 0);
+    }
+    void look(float dx, float dy) {
+        yaw_ = std::remainder(yaw_ + dx * mouseSensitivity, DirectX::XM_2PI);
+        pitch_ = std::clamp(pitch_ - dy * mouseSensitivity, -pitchLimit, pitchLimit);
     }
     void update(float thrust, float yaw, float pitch, float vertical, bool fast, float dt) {
         using namespace DirectX;

@@ -12,6 +12,13 @@ int main() {
     Ship diagonal; diagonal.update(1,0,0,1,false,1);
     auto p = diagonal.position();
     if (!close(std::sqrt(p.y*p.y+p.z*p.z), Ship::speed)) return fail("normalized movement");
+    Ship mouse; mouse.look(100, -200);
+    if (!close(mouse.yaw(), 100 * Ship::mouseSensitivity) ||
+        !close(mouse.pitch(), 200 * Ship::mouseSensitivity)) return fail("mouse direction and sensitivity");
+    Ship split; split.look(40, -80); split.look(60, -120);
+    if (!close(mouse.yaw(), split.yaw()) || !close(mouse.pitch(), split.pitch())) return fail("mouse displacement independent of frame count");
+    mouse.look(0, -100000); if (!close(mouse.pitch(), Ship::pitchLimit)) return fail("mouse pitch clamp");
+    mouse.look(0, 200000); if (!close(mouse.pitch(), -Ship::pitchLimit)) return fail("mouse negative pitch clamp");
     Ship turn; turn.update(0,1,1,0,false,0.5f);
     if (!close(turn.yaw(), Ship::turnRate/2) || !close(turn.pitch(), Ship::turnRate/2)) return fail("turn rates");
     auto parts = turn.objects();
