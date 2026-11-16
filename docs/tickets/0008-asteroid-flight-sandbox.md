@@ -1,7 +1,7 @@
 # 0008 - Asteroid flight sandbox
 
 Name: Asteroid flight sandbox
-Status: process
+Status: done
 Dependencies: 0007-player-ship-and-chase-camera.md.
 
 ## Description
@@ -21,3 +21,5 @@ Add simple, documented collision volumes and an observable ship/asteroid contact
 ## Boundaries
 
 No full physics engine, asteroid destruction, weapons, enemies, scoring, wave system or required instancing optimization yet.
+
+User accepted this ticket on 2026-11-16. Earlier verification notes describe the state before that acceptance.

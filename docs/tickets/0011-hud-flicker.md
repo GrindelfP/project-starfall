@@ -1,7 +1,7 @@
 # 0011 - Stop HUD flicker
 
 Name: Stop HUD flicker
-Status: implementation in progress; interactive acceptance pending
+Status: done
 Dependencies: 0008-asteroid-flight-sandbox.md (existing HUD implementation).
 
 ## Description
@@ -23,3 +23,5 @@ No general UI framework or visual redesign is required. Obtain approval for any 
 The GDI child panel shared the parent client area with DXGI presentation. Its periodic invalidation could make the panel visible again after presentation overwrote its pixels. The correction uses a nonactivating owned popup, composed separately from the swap chain, with its position, dimensions and DPI synchronized to the parent client area. The existing text update interval and click-through behavior are retained, and reference and benchmark scenes still create no HUD. This is the suspected cause; visual reproduction and confirmation on both backends remain outstanding.
 
 Integrated Debug and Release builds and CTest passed 5/5 each on 2026-11-16; bounded Debug sandbox demos exited successfully on both backends. Sustained flight, changing status, resize, minimize/restore, focus, DPI, mouse capture/release and camera switching require interactive verification on DX11 and DX12 before closing this ticket. In particular, check positioning during an active window move or resize as well as after it ends.
+
+User accepted this ticket on 2026-11-16. Earlier verification notes describe the state before that acceptance.

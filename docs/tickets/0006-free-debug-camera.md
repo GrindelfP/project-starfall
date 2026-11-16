@@ -1,7 +1,7 @@
 # 0006 - Free-flying debug camera
 
 Name: Free-flying debug camera
-Status: process
+Status: done
 Dependencies: 0005-indexed-3d-scene-and-depth.md.
 
 ## Description
@@ -25,3 +25,5 @@ No camera collision, third-party UI dependency, editor, orbit camera or third-pe
 ## Implementation evidence
 
 Controls and automated coverage are documented in `docs/camera.md`. Debug and Release builds succeeded, and CTest passed all three tests in each configuration, including camera tests. Interactive navigation, capture and focus behavior remain to be manually validated.
+
+User accepted this ticket on 2026-11-16. Earlier verification notes describe the state before that acceptance.

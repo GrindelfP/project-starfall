@@ -1,7 +1,7 @@
 # 0014 - Inertial heavy-ship flight
 
 Name: Inertial heavy-ship flight
-Status: implemented; interactive acceptance pending
+Status: done
 Dependencies: 0007-player-ship-and-chase-camera.md (existing ship implementation); coordinate controls and orientation with 0013-mouse-ship-orientation.md.
 
 ## Description
@@ -23,3 +23,5 @@ No claim of full spacecraft or rigid-body simulation; no gravitational model, ae
 ## Implementation and verification
 
 Implemented world-space inertial velocity with normalized thrust, no drag, 3 units/s² acceleration (6 with boost), and an artificial 12 units/s speed cap. S applies reverse thrust and can brake, while turning leaves existing velocity unchanged. Reset and asteroid contact clear velocity. Ship simulation pauses in free-camera mode. See `docs/flight.md` for integration, controls and limitations. The existing translation sweep covers displacement at the capped speed; it approximates rotation using the final pose. Integrated Debug and Release builds and CTest passed 5/5 each on 2026-11-16, and bounded Debug sandbox demos exited successfully on both backends. Manual handling, collision and chase-camera acceptance remain pending in both renderers.
+
+User accepted this ticket on 2026-11-16. Earlier verification notes describe the state before that acceptance.
