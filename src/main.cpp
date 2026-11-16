@@ -325,7 +325,7 @@ int main(int argc, char** argv) {
                     std::wostringstream overlay;
                     overlay << L"STARFALL / FLIGHT SANDBOX\n"
                         << L"Mouse steer   W/S thrust   A/D yaw   Up/Down pitch   Space/Ctrl rise/drop\n"
-                        << L"Shift boost   C camera   R reset   Esc release mouse\n"
+                        << L"S reverse/brake   Shift boost   C camera   R reset   Esc release mouse\n"
                         << L"Free camera: right-click + mouse, WASD + Q/E\n"
                         << (chase ? L"CHASE" : L"FREE") << L"   Seed " << seed << L"   Contacts " << contacts;
                     hud->setText(overlay.str());
