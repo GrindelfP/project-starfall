@@ -8,6 +8,7 @@
 class Ship {
 public:
     static constexpr float acceleration = 3.0f, boost = 2.0f, maxSpeed = 12.0f, turnRate = 1.4f;
+    static constexpr float brakeDeceleration = 6.0f; // world units/s²
     static constexpr float mouseSensitivity = 0.0025f; // radians per raw mouse count
     static constexpr float pitchLimit = DirectX::XM_PIDIV2 - 0.05f;
     void reset() { position_ = {0, 0, 0}; velocity_ = {0, 0, 0}; yaw_ = pitch_ = 0; }
@@ -19,18 +20,23 @@ public:
         yaw_ = std::remainder(yaw_ + dx * mouseSensitivity, DirectX::XM_2PI);
         pitch_ = std::clamp(pitch_ - dy * mouseSensitivity, -pitchLimit, pitchLimit);
     }
-    void update(float thrust, float yaw, float pitch, float vertical, bool fast, float dt) {
+    void update(float thrust, float lateral, float yaw, float pitch, float vertical, bool fast, bool brake, float dt) {
         using namespace DirectX;
         if (dt <= 0) return;
         yaw_ = std::remainder(yaw_ + yaw * turnRate * dt, XM_2PI);
         pitch_ = std::clamp(pitch_ + pitch * turnRate * dt, -pitchLimit, pitchLimit);
-        XMVECTOR delta = XMVectorAdd(XMVectorScale(forward(), thrust), XMVectorSet(0, vertical, 0, 0));
+        const XMVECTOR right = XMVectorSet(std::cos(yaw_), 0, -std::sin(yaw_), 0);
+        XMVECTOR delta = XMVectorAdd(XMVectorAdd(XMVectorScale(forward(), thrust), XMVectorScale(right, lateral)), XMVectorSet(0, vertical, 0, 0));
         const float length = XMVectorGetX(XMVector3Length(delta));
         if (length > 1) delta = XMVectorScale(delta, 1 / length);
         const XMVECTOR oldVelocity = XMLoadFloat3(&velocity_);
         XMVECTOR newVelocity = XMVectorAdd(oldVelocity,
             XMVectorScale(delta, acceleration * (fast ? boost : 1.0f) * dt));
-        const float speed = XMVectorGetX(XMVector3Length(newVelocity));
+        float speed = XMVectorGetX(XMVector3Length(newVelocity));
+        if (brake && speed > 0) {
+            newVelocity = XMVectorScale(newVelocity, std::max(0.0f, speed - brakeDeceleration * dt) / speed);
+            speed = XMVectorGetX(XMVector3Length(newVelocity));
+        }
         if (speed > maxSpeed) newVelocity = XMVectorScale(newVelocity, maxSpeed / speed);
         XMStoreFloat3(&position_, XMVectorAdd(XMLoadFloat3(&position_),
             XMVectorScale(XMVectorAdd(oldVelocity, newVelocity), 0.5f * dt)));

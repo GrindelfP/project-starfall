@@ -304,10 +304,11 @@ int main(int argc, char** argv) {
                     const float step = demo ? 1.0f / 60.0f : static_cast<float>(dt);
                     const auto previousPosition = ship.position();
                     ship.update(demo ? 1.0f : static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
-                        demo ? 0.35f : static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
+                        demo ? 0.0f : static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
+                        demo ? 0.35f : static_cast<float>(state.input.held(VK_RIGHT)) - static_cast<float>(state.input.held(VK_LEFT)),
                         demo ? 0.12f : static_cast<float>(state.input.held(VK_UP)) - static_cast<float>(state.input.held(VK_DOWN)),
                         demo ? 0.0f : static_cast<float>(state.input.held(VK_SPACE)) - static_cast<float>(state.input.held(VK_CONTROL)),
-                        !demo && state.input.held(VK_SHIFT), step);
+                        !demo && state.input.held(VK_SHIFT), !demo && state.input.held('B'), step);
                     if (field.contact(ship.objects(), previousPosition, ship.position())) {
                         ++contacts;
                         ship.reset();
@@ -324,8 +325,8 @@ int main(int argc, char** argv) {
                 if (hud && hudElapsed >= 0.25) {
                     std::wostringstream overlay;
                     overlay << L"STARFALL / FLIGHT SANDBOX\n"
-                        << L"Mouse steer   W/S thrust   A/D yaw   Up/Down pitch   Space/Ctrl rise/drop\n"
-                        << L"S reverse/brake   Shift boost   C camera   R reset   Esc release mouse\n"
+                        << L"Mouse/arrows steer   WASD thrust   Space/Ctrl rise/drop\n"
+                        << L"B brake   Shift boost   C camera   R reset   Esc release mouse\n"
                         << L"Free camera: right-click + mouse, WASD + Q/E\n"
                         << (chase ? L"CHASE" : L"FREE") << L"   Seed " << seed << L"   Contacts " << contacts;
                     hud->setText(overlay.str());
