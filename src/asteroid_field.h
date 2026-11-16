@@ -1,5 +1,6 @@
 #pragma once
 #include "scene.h"
+#include "collision.h"
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -32,9 +33,27 @@ public:
         const float x=a.x-b.x, y=a.y-b.y, z=a.z-b.z, r=ar+br;
         return x*x+y*y+z*z <= r*r;
     }
-    bool contact(DirectX::XMFLOAT3 position) const {
-        for (const auto& rock : rocks_) if (overlaps(position, shipRadius, rock.center, rock.radius)) return true;
+    // Parts are at the final pose. Rotation during a sweep is approximated by that pose.
+    bool contact(const std::vector<scene::Object>& parts, DirectX::XMFLOAT3 previousPosition,
+                 DirectX::XMFLOAT3 position) const {
+        const DirectX::XMFLOAT3 displacement{position.x-previousPosition.x,
+            position.y-previousPosition.y, position.z-previousPosition.z};
+        for (const auto& rock : rocks_) for (const auto& box : rockObjects(rock)) {
+            for (auto part : parts) {
+                part.translation.x-=displacement.x;
+                part.translation.y-=displacement.y;
+                part.translation.z-=displacement.z;
+                if (collision::sweptBoxes(part, displacement, box)) return true;
+            }
+        }
         return false;
+    }
+    static std::array<scene::Object, 2> rockObjects(const Rock& rock) {
+        const auto r = rock.radius;
+        return {{{{1.25f*r,0.95f*r,0.95f*r}, rock.rotation, rock.center, rock.color},
+            {{0.9f*r,1.2f*r,0.9f*r},
+                {rock.rotation.x+0.55f,rock.rotation.y+0.65f,rock.rotation.z+0.4f}, rock.center,
+                {rock.color.x*0.8f,rock.color.y*0.8f,rock.color.z*0.8f,1}}}};
     }
     std::uint32_t seed() const { return seed_; }
     const std::array<Rock, count>& rocks() const { return rocks_; }
@@ -42,11 +61,8 @@ public:
         std::vector<scene::Object> result;
         result.reserve(count*2 + 100);
         for (const auto& rock : rocks_) {
-            const auto r = rock.radius;
-            result.push_back({{1.25f*r,0.95f*r,0.95f*r}, rock.rotation, rock.center, rock.color});
-            result.push_back({{0.9f*r,1.2f*r,0.9f*r},
-                {rock.rotation.x+0.55f,rock.rotation.y+0.65f,rock.rotation.z+0.4f}, rock.center,
-                {rock.color.x*0.8f,rock.color.y*0.8f,rock.color.z*0.8f,1}});
+            const auto boxes = rockObjects(rock);
+            result.insert(result.end(), boxes.begin(), boxes.end());
         }
         // Stationary sparse star points and colored wayfinding lights, sharing the cube mesh.
         std::uint32_t state = 0x91e10da5u;
@@ -66,3 +82,4 @@ private:
     std::uint32_t seed_{};
     std::array<Rock, count> rocks_{};
 };
+
