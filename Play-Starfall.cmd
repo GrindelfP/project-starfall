@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "starfallExe=%~dp0out\build\release\starfall.exe"
+set "starfallExe=%~dp0out\build\release\starfall_dx11.exe"
 if not exist "%starfallExe%" (
     echo Starfall Release build was not found. From the repository root, run in Windows PowerShell:
     echo   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -NoExit

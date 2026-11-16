@@ -8,6 +8,6 @@
 - Ask before substantive architectural/structure changes, substantial dependencies, overwriting user work, deleting files, security changes, GPU driver changes, or SSH key changes.
 - Preserve files. Move retired material to a suitable `legacy/` location with approval where required.
 - Never commit credentials, SSH material, or generated binaries. Keep build products in ignored `out/`.
-- Obtain explicit approval before each commit and separately before each push. No destructive Git operations or force pushes.
+- Agents and subagents may commit and push project work autonomously without separate approval. Preserve unrelated work, inspect remote changes, and use non-destructive Git operations; no force pushes.
 - Use commit prefixes `[INIT]`, `[FIX]`, `[BUGFIX]`, `[FEATURE]`, `[STABLE]`, or `[UPDATE]` as appropriate. Fetch and inspect remote changes before finishing; do not overwrite local work.
 - Append a concise local-time entry to `docs/session-log.md` at session end. Report installed, compiled, executed, functionally validated, untested and blocked states accurately.

@@ -12,9 +12,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 add_executable(starfall WIN32 src/main.cpp src/dx11.cpp src/dx11.h src/dx12.cpp src/dx12.h)
-target_link_options(starfall PRIVATE /ENTRY:mainCRTStartup)
-target_link_libraries(starfall PRIVATE d3d11 d3d12 dxgi dxguid d3dcompiler)
-target_compile_definitions(starfall PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+add_executable(starfall_dx11 WIN32 src/main.cpp src/dx11.cpp src/dx11.h src/dx12.cpp src/dx12.h)
+add_executable(starfall_dx12 WIN32 src/main.cpp src/dx11.cpp src/dx11.h src/dx12.cpp src/dx12.h)
+foreach(target IN ITEMS starfall starfall_dx11 starfall_dx12)
+    target_link_options(${target} PRIVATE /ENTRY:mainCRTStartup)
+    target_link_libraries(${target} PRIVATE d3d11 d3d12 dxgi dxguid d3dcompiler)
+    target_compile_definitions(${target} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+endforeach()
+target_compile_definitions(starfall_dx12 PRIVATE STARFALL_DEFAULT_DX12)
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene.hlsl"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
@@ -22,6 +27,8 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene.hlsl"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/scene.hlsl" VERBATIM)
 add_custom_target(starfall_shaders ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/shaders/scene.hlsl")
 add_dependencies(starfall starfall_shaders)
+add_dependencies(starfall_dx11 starfall_shaders)
+add_dependencies(starfall_dx12 starfall_shaders)
 
 enable_testing()
 add_executable(starfall_input_timing_tests tests/input_timing_tests.cpp)
@@ -57,6 +64,8 @@ foreach(stage IN ITEMS vs ps)
 endforeach()
 add_custom_target(starfall_dx12_shaders ALL DEPENDS ${dx12_shaders})
 add_dependencies(starfall starfall_dx12_shaders)
+add_dependencies(starfall_dx11 starfall_dx12_shaders)
+add_dependencies(starfall_dx12 starfall_dx12_shaders)
 
 add_executable(starfall_ship_tests tests/ship_tests.cpp)
 target_include_directories(starfall_ship_tests PRIVATE src)

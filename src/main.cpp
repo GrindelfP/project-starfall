@@ -107,7 +107,12 @@ int main(int argc, char** argv) {
         bool lifecycleTest = false;
         bool reverseOrder = false;
         bool depthCheck = false;
-        bool useDx12 = false, clearOnly = false, referenceScene = false, demo = false;
+#ifdef STARFALL_DEFAULT_DX12
+        bool useDx12 = true;
+#else
+        bool useDx12 = false;
+#endif
+        bool clearOnly = false, referenceScene = false, demo = false;
         std::filesystem::path capturePath;
         std::filesystem::path benchmarkPath;
         std::uint32_t seed = AsteroidField::defaultSeed;

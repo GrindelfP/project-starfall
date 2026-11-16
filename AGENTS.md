@@ -7,4 +7,4 @@ Read [RULES.md](RULES.md) first. It contains the user's approval requirements.
 - Configure/build with `cmake --preset debug` / `cmake --build --preset debug`, or the corresponding `release` presets. Run the CTest suite from the matching build directory.
 - Keep outputs in ignored `out/`. See `docs/development-environment.md` for verification evidence and diagnostic locations.
 - Architecture context is in `docs/architecture.md`. Append session handoffs to `docs/session-log.md` in Europe/Moscow time.
-- Private skills live in a separate user checkout. `grindelf-project-bootstrap` was explicitly approved as the replacement for the absent `grindelf-initialize`. User approval rules override any skill's automatic commit/push cadence.
+- Private skills live in a separate user checkout. `grindelf-project-bootstrap` was explicitly approved as the replacement for the absent `grindelf-initialize`. Agents and subagents may commit and push autonomously under `RULES.md`.

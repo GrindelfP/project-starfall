@@ -1,5 +1,17 @@
 # Session log
 
+2026-11-16 - 11:49 MSK - Updated project policy at user request to allow autonomous agent/subagent commits and pushes. Prepared session handoff and publication; ticket 0015 interactive acceptance remains pending, and the latest full Release build was blocked by a running legacy starfall.exe. Named DX11/DX12 executables and both CTest suites were verified as recorded below.
+
+2026-11-16 - 11:44 MSK - Implemented ticket 0015 translation, arrow steering and world-space braking; Debug and Release builds and CTest passed 5/5 each. Bounded Release runs verified both named executable backend defaults. Interactive control, HUD and input-lifecycle checks remain pending on DX11 and DX12; ticket remains in progress.
+
+2026-11-16 - 11:44 MSK - Built distinct DX11 and DX12 executables and updated both launchers; bounded Release runs confirmed each default backend and exited 0. Debug and Release CTest passed 5/5. The full Release build could not relink the legacy starfall.exe because it was in use; the named executables built successfully. Ticket 0015 intermediate commit 6d075d3 was authorized and created; final integration and interactive acceptance remain pending.
+
+2026-11-16 - 11:40 MSK - Rebuilt the Release executable used by both launchers with the in-progress ticket 0015 controls after the user reported seeing the old behavior. Debug and Release builds and CTest passed 5/5 each; bounded Release sandbox demos exited successfully on DX11 and DX12. Interactive control and HUD validation remains outstanding, and the implementation is uncommitted pending intermediate-commit approval.
+
+2026-11-16 - 11:38 MSK - Added a separate DX12 Release launcher alongside the existing DX11 launcher and documented both. Ticket 0015 implementation remains uncommitted, awaiting approval of its intermediate snapshot; interactive validation and integrated builds remain outstanding.
+
+2026-11-16 - 11:30 MSK - Drafted ticket 0015 for requested WASD translation, arrow-key rotation and a dedicated velocity brake; linked the planned controls from README. No implementation or verification runs performed. Existing world-space vertical thrust is retained as the planning assumption.
+
 2026-11-16 - 10:56 MSK - Prepared the eight implementation commits for publication at user request. Next: interactively verify HUD stability and window lifecycle, mouse capture and steering, near misses and impacts, and inertial handling on both backends; tune the flight model from feedback. The HUD cause remains suspected, and collision does not sweep rotation continuously.
 
 2026-11-16 - 10:41 MSK - Coordinated Terra agents for tickets 0011-0014: HUD composition, cuboid collision with translational sweep, mouse steering and inertial flight. Integrated Debug and Release builds and CTest passed 5/5 each; bounded Debug sandbox demos exited successfully on DX11 and DX12. Interactive HUD, collision and flight acceptance remains pending; rotation is not continuously swept. No push authorized for this implementation.

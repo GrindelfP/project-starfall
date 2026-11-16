@@ -2,9 +2,9 @@
 
 A native Windows C++20 space-flight sandbox and graphics research project with DirectX 11 and DirectX 12 renderers. Fly among a reproducible field of placeholder asteroids; contact resets the ship. This is an early prototype.
 
-Double-click **Play-Starfall.cmd** for the DX11 Release sandbox, or **Play-Starfall-DX12.cmd** for DX12. If the Release build is missing, the launchers print the build commands. They do not build or update files. Close the game with the window close button or Alt+F4.
+Double-click **Play-Starfall.cmd** for the DX11 Release sandbox, or **Play-Starfall-DX12.cmd** for DX12. They start `starfall_dx11.exe` and `starfall_dx12.exe` respectively. If the Release build is missing, the launchers print the build commands. They do not build or update files. Close the game with the window close button or Alt+F4.
 
-In chase view, use W/S for thrust, A/D for yaw, Up/Down for pitch, Space/Ctrl for vertical movement and Shift for boost. C toggles the free camera, and R restores the ship, camera and seeded field. In free view, W/A/S/D and Q/E move; right-click captures the mouse for looking and Escape releases it. See [flight controls](docs/flight.md) and [camera controls](docs/camera.md).
+In chase view, use W/S for forward/reverse thrust, A/D for lateral thrust, arrow keys for rotation, Space/Ctrl for vertical movement, B to brake and Shift for boost. C toggles the free camera, and R restores the ship, camera and seeded field. In free view, W/A/S/D and Q/E move; right-click captures the mouse for looking and Escape releases it. See [flight controls](docs/flight.md) and [camera controls](docs/camera.md).
 
 From the repository root, build with Windows PowerShell, MSVC x64, CMake and Ninja:
 
