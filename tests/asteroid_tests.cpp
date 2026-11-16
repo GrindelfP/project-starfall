@@ -25,7 +25,19 @@ int main() {
         b.translation={2.01f*std::cos(angle),2.01f*std::sin(angle),2.01f};
         if (collision::sweptBoxes(a,{0,0,0},b)) return fail("rotated corner miss");
     }
+    // Actual ship nose and rock box, separated along local x, at several orientations.
     Ship ship;
+    for (float angle : {0.0f, 0.5f, 1.2f}) {
+        auto nose=ship.objects()[1];
+        nose.rotation={0,0,angle}; nose.translation={0,0,0};
+        AsteroidField::Rock rock{{0,0,0},2,{0,0,angle},{}};
+        auto box=AsteroidField::rockObjects(rock)[0];
+        const float limit=(nose.scale.x+box.scale.x)/2;
+        box.translation={(limit+0.01f)*std::cos(angle),(limit+0.01f)*std::sin(angle),0};
+        if (collision::sweptBoxes(nose,{0,0,0},box)) return fail("ship rock side miss");
+        box.translation={(limit-0.01f)*std::cos(angle),(limit-0.01f)*std::sin(angle),0};
+        if (!collision::sweptBoxes(nose,{0,0,0},box)) return fail("ship rock impact");
+    }
     for (unsigned seed : {0u,1u,42u,AsteroidField::defaultSeed,0xffffffffu}) {
         AsteroidField x(seed), y(seed), z(seed+1);
         if (x.seed()!=seed || x.contact(ship.objects(),ship.position(),ship.position())) return fail("safe spawn/seed");
@@ -46,3 +58,5 @@ int main() {
     }
     return 0;
 }
+
+

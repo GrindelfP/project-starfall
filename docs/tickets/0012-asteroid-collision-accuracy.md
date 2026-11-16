@@ -1,7 +1,7 @@
 # 0012 - Correct premature asteroid contacts
 
 Name: Correct premature asteroid contacts
-Status: ready
+Status: implemented; manual acceptance pending
 Dependencies: 0008-asteroid-flight-sandbox.md (existing collision implementation).
 
 ## Description
@@ -18,3 +18,8 @@ Reproduce the reported ship respawn when flying close to an asteroid without vis
 ## Boundaries
 
 Do not add asteroid destruction or change the contact response. No third-party physics engine is required; seek approval for a substantial dependency or architecture change.
+
+## Implementation and verification
+
+Collision uses the visible ship and rock cuboids as oriented boxes, with a 0.00001 world-unit contact tolerance. Each frame sweeps translation continuously using the ship's final orientation. This catches translational tunneling, but does not sweep rotation: a rapidly rotating extremity can pass through a rock between frames. Debug build and CTest passed 5/5 on 2026-11-16. Manual near-miss and impact checks on DX11 and DX12 remain pending; no interactive result is claimed.
+
