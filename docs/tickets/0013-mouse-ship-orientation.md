@@ -1,7 +1,7 @@
 # 0013 - Mouse-controlled ship orientation
 
 Name: Mouse-controlled ship orientation
-Status: ready
+Status: implemented; interactive acceptance pending
 Dependencies: 0003-frame-timing-and-input.md, 0007-player-ship-and-chase-camera.md (existing input and ship implementation).
 
 ## Description
@@ -18,3 +18,7 @@ Use relative mouse movement to control the ship's orientation in chase mode. Est
 ## Boundaries
 
 No combat, targeting or required roll control. Coordinate the control scheme with 0014; do not silently decide unresolved gameplay bindings.
+
+## Implementation and verification
+
+Right-click captures, Escape releases; captured mouse steers the ship in chase view and looks around in free view. Horizontal counts yaw right, upward movement pitches up; sensitivity is 0.0025 radians/count and pitch is limited to ±(π/2 − 0.05). A/D and Up/Down remain keyboard alternatives. C switches views and R resets; both discard queued mouse motion. Automated coverage checks mouse orientation and frame-count independence. Interactive flight, including capture transitions and visual agreement, remains to be validated in both renderers.

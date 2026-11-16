@@ -26,6 +26,7 @@ struct WindowState {
     std::ostream* log = nullptr;
     bool focused = false;
     bool captured = false;
+    Hud* hud = nullptr;
     InputState input;
     FrameTimer timer;
 };
@@ -40,12 +41,15 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (message == WM_SIZE) {
             state->minimized = wParam == SIZE_MINIMIZED;
             state->sizeChanged = true;
+            if (state->hud) state->hud->updateLayout();
             if (state->minimized) {
                 state->timer.reset();
                 state->input.clear();
                 if (state->captured) ReleaseCapture();
             }
             *state->log << (state->minimized ? "Minimized\n" : "Client size changed\n");
+        } else if (message == WM_MOVE) {
+            if (state->hud) state->hud->updateLayout();
         } else if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {
             state->focused = message == WM_SETFOCUS;
             state->timer.reset();
@@ -82,6 +86,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             SetWindowPos(window, nullptr, suggested->left, suggested->top,
                 suggested->right - suggested->left, suggested->bottom - suggested->top,
                 SWP_NOACTIVATE | SWP_NOZORDER);
+            if (state->hud) state->hud->updateLayout();
             *state->log << "DPI changed: " << HIWORD(wParam) << '\n';
             return 0;
         }
@@ -204,6 +209,8 @@ int main(int argc, char** argv) {
             unsigned long contacts = 0;
             std::unique_ptr<Hud> hud;
             if (!referenceScene) hud = std::make_unique<Hud>(window);
+            state.hud = hud.get();
+            struct HudStateGuard { WindowState& state; ~HudStateGuard() { state.hud = nullptr; } } hudStateGuard{state};
             double hudElapsed = 1.0;
             log << "Asteroid seed: " << seed << "; rocks: " << field.count << '\n';
             bool chase = !referenceScene;
@@ -262,6 +269,7 @@ int main(int argc, char** argv) {
                     DispatchMessageW(&message);
                 }
                 if (!running) break;
+                if (hud) hud->updateLayout();
                 if (state.minimized || (!state.focused && benchmarkPath.empty())) {
                     state.timer.reset();
                     if (!WaitMessage()) throw std::runtime_error("WaitMessage failed");
@@ -285,19 +293,22 @@ int main(int argc, char** argv) {
                     state.input.discardMouse();
                 }
                 if (state.input.pressed('R')) {
+                    state.input.discardMouse();
                     camera.reset();
                     ship.reset();
                     field.reset(seed);
                     fieldObjects = field.objects();
                     contacts = 0;
                 } else if (chase) {
+                    if (!demo && state.captured) ship.look(static_cast<float>(state.input.mouseX()), static_cast<float>(state.input.mouseY()));
                     const float step = demo ? 1.0f / 60.0f : static_cast<float>(dt);
+                    const auto previousPosition = ship.position();
                     ship.update(demo ? 1.0f : static_cast<float>(state.input.held('W')) - static_cast<float>(state.input.held('S')),
                         demo ? 0.35f : static_cast<float>(state.input.held('D')) - static_cast<float>(state.input.held('A')),
                         demo ? 0.12f : static_cast<float>(state.input.held(VK_UP)) - static_cast<float>(state.input.held(VK_DOWN)),
                         demo ? 0.0f : static_cast<float>(state.input.held(VK_SPACE)) - static_cast<float>(state.input.held(VK_CONTROL)),
                         !demo && state.input.held(VK_SHIFT), step);
-                    if (field.contact(ship.position())) {
+                    if (field.contact(ship.objects(), previousPosition, ship.position())) {
                         ++contacts;
                         ship.reset();
                         log << "Asteroid contact " << contacts << "; ship reset\n";
@@ -313,7 +324,7 @@ int main(int argc, char** argv) {
                 if (hud && hudElapsed >= 0.25) {
                     std::wostringstream overlay;
                     overlay << L"STARFALL / FLIGHT SANDBOX\n"
-                        << L"W/S thrust   A/D yaw   Up/Down pitch   Space/Ctrl rise/drop\n"
+                        << L"Mouse steer   W/S thrust   A/D yaw   Up/Down pitch   Space/Ctrl rise/drop\n"
                         << L"Shift boost   C camera   R reset   Esc release mouse\n"
                         << L"Free camera: right-click + mouse, WASD + Q/E\n"
                         << (chase ? L"CHASE" : L"FREE") << L"   Seed " << seed << L"   Contacts " << contacts;
@@ -388,6 +399,3 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
-
-
-
